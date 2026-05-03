@@ -1,28 +1,29 @@
 # ─── Audio capture ────────────────────────────────────────────────────────────
-sounddevice==0.5.1
-numpy==1.26.4
+sounddevice>=0.5.1
+# numpy 2.x is required for Python 3.13+; pip picks the right version automatically
+numpy>=1.26.4
 
 # ─── Voice Activity Detection ─────────────────────────────────────────────────
 # webrtcvad-wheels ships pre-built binaries for Windows — no C compiler needed.
-webrtcvad-wheels==2.0.14
+webrtcvad-wheels>=2.0.14
 
 # ─── Local STT (offline) ──────────────────────────────────────────────────────
-faster-whisper==1.0.3
+faster-whisper>=1.0.3
 
 # ─── Cloud STT (Azure) ────────────────────────────────────────────────────────
-azure-cognitiveservices-speech==1.37.0
+azure-cognitiveservices-speech>=1.37.0
 
 # ─── Secure credential storage ────────────────────────────────────────────────
-keyring==25.2.1
+keyring>=25.2.1
 
 # ─── System tray icon ─────────────────────────────────────────────────────────
-pystray==0.19.5
-# Pillow: pinned to a release with official Windows wheels — no build tools needed.
-Pillow==10.4.0
+pystray>=0.19.5
+Pillow>=10.4.0
 
 # ─── Global hotkeys ───────────────────────────────────────────────────────────
-keyboard==0.13.5
+keyboard>=0.13.5
 
 # ─── Windows text injection / clipboard ───────────────────────────────────────
-pywin32==306
-pyperclip==1.9.0
+# pywin32 311+ adds Python 3.13 support
+pywin32>=311
+pyperclip>=1.9.0

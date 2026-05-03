@@ -21,6 +21,7 @@ classifiers = [
     "Operating System :: Microsoft :: Windows",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Multimedia :: Sound/Audio :: Speech",
 ]
 dependencies = [
@@ -33,15 +34,15 @@ dependencies = [
     "pystray>=0.19.5",
     "Pillow>=10.4.0",
     "keyboard>=0.13.5",
-    "pywin32>=306",
+    "pywin32>=311",
     "pyperclip>=1.9.0",
 ]
 
 [project.urls]
-Homepage = "https://github.com/yourusername/DictateAnywhere"
-Repository = "https://github.com/yourusername/DictateAnywhere"
-"Bug Tracker" = "https://github.com/yourusername/DictateAnywhere/issues"
-Changelog = "https://github.com/yourusername/DictateAnywhere/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/stephendias-NPD/DictateAnywhere"
+Repository = "https://github.com/stephendias-NPD/DictateAnywhere"
+"Bug Tracker" = "https://github.com/stephendias-NPD/DictateAnywhere/issues"
+Changelog = "https://github.com/stephendias-NPD/DictateAnywhere/blob/main/CHANGELOG.md"
 
 [project.scripts]
 dictateanywhere = "dictateanywhere.main:main"
