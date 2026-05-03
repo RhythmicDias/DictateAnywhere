@@ -82,6 +82,10 @@ class Config:
     # ── UI theme ──────────────────────────────────────────────────────────────
     theme: str = "system"               # "system" | "light" | "dark"
 
+    # ── Transcription preview overlay ─────────────────────────────────────────
+    show_preview_window: bool = True     # show floating preview after dictation
+    preview_hide_after_ms: int = 8000   # ms before overlay auto-hides (0 = never)
+
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 

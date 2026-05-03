@@ -46,6 +46,7 @@ from .core.corrections import CorrectionsManager
 from .ui.tray import TrayIcon
 from .ui.floating_widget import FloatingWidget
 from .ui.settings_window import SettingsWindow
+from .ui.preview_window import PreviewWindow
 
 logger = logging.getLogger(__name__)
 
@@ -148,11 +149,17 @@ class DictateAnywhere:
             corrections_manager=self._corr,
         )
 
+        self._preview = PreviewWindow(
+            root=self._root,
+            config_manager=self._cfg,
+        )
+
         self._tray = TrayIcon(
             on_start_dictation=self._start_dictation,
             on_stop_dictation=self._stop_dictation,
             on_open_settings=self._settings_win.open,
             on_toggle_widget=self._floating.toggle_visibility,
+            on_toggle_preview=self._preview.toggle_visibility,
             on_quit=self._quit,
             schedule_gui=self._schedule,
         )
@@ -280,6 +287,8 @@ class DictateAnywhere:
                 if text.strip():
                     logger.info("Injecting: %r", text[:80])
                     self._injector.inject(text + " ")
+                    # Show in preview overlay (must run on main thread)
+                    self._root.after(0, self._preview.show_text, text.strip())
         except Exception as exc:
             logger.exception("Transcription/injection error: %s", exc)
         finally:
@@ -395,6 +404,7 @@ class DictateAnywhere:
     def _apply_state(self, state: str) -> None:
         self._tray.set_state(state)
         self._floating.set_state(state)
+        self._preview.set_listening(state == "active")
 
     # ── Widget moved ───────────────────────────────────────────────────────────
 

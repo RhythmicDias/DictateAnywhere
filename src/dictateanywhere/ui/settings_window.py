@@ -223,6 +223,18 @@ class SettingsWindow:
         ttk.Label(f, text="Button position will be saved automatically as you drag it.",
                   foreground="gray").pack(anchor=tk.W, padx=_PAD)
 
+        # ── Transcription preview overlay ──────────────────────────────────
+        ttk.Separator(f).pack(fill=tk.X, padx=_PAD, pady=_PAD)
+        ttk.Label(f, text="Transcription Preview Overlay",
+                  font=("", 9, "bold")).pack(anchor=tk.W, padx=_PAD)
+        _hint(f, "A floating dark bar that shows each dictated sentence.\n"
+              "Appears at the bottom of the screen and fades away automatically.\n"
+              "Drag it by its header to reposition. Toggle anytime from the tray icon.")
+        self._check(f, "Show preview overlay after dictation", "show_preview_window")
+        self._spin(f, "Auto-hide after (ms)", "preview_hide_after_ms", 0, 30000, 1000,
+                   "How long (milliseconds) the overlay stays visible after the last\n"
+                   "utterance. Set to 0 to keep it open until manually closed.")
+
     def _build_tab_cloud(self, nb: ttk.Notebook) -> None:
         f = self._tab(nb, "Azure Cloud")
         ttk.Label(f, text="Azure Speech API Key", font=("", 9, "bold")).pack(
