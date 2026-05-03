@@ -33,6 +33,7 @@ class VADFilter:
         sample_rate: int = SAMPLE_RATE,
         speech_pad_frames: int = 5,   # extra frames kept after speech ends
     ) -> None:
+        aggressiveness = int(aggressiveness)   # config may deserialise as float
         if aggressiveness not in (0, 1, 2, 3):
             raise ValueError("VAD aggressiveness must be 0, 1, 2, or 3")
         self._vad = webrtcvad.Vad(aggressiveness)

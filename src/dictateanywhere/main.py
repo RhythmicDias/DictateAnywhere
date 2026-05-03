@@ -82,7 +82,7 @@ class DictateAnywhere:
             delay_ms=self._cfg.get("inject_delay_ms", 50),
         )
         self._vad = VADFilter(
-            aggressiveness=self._cfg.get("vad_aggressiveness", 2)
+            aggressiveness=int(self._cfg.get("vad_aggressiveness", 2))
         )
 
         # ── Engines ───────────────────────────────────────────────────────────
