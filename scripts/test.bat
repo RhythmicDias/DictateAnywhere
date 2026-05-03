@@ -15,10 +15,10 @@ if not exist "%PYTHON%" (
 )
 
 echo [DictateAnywhere] Installing pytest ...
-%PYTHON% -m pip install pytest --quiet
+"%PYTHON%" -m pip install pytest --quiet
 
 echo.
 echo [DictateAnywhere] Running tests ...
-%PYTHON% -m pytest tests\ -v --tb=short
+"%PYTHON%" -m pytest tests\ -v --tb=short
 
 pause

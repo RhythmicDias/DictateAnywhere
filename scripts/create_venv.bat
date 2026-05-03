@@ -8,6 +8,16 @@ setlocal
 
 set VENV_DIR=.venv
 
+echo [DictateAnywhere] Checking Python version ...
+python --version 2>nul
+if errorlevel 1 (
+    echo ERROR: Python not found on PATH.
+    echo Download Python 3.11 or 3.12 (64-bit) from https://www.python.org/downloads/
+    pause
+    exit /b 1
+)
+
+echo.
 echo [DictateAnywhere] Creating virtual environment in %VENV_DIR% ...
 python -m venv %VENV_DIR%
 if errorlevel 1 (

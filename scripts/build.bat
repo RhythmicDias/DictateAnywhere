@@ -8,7 +8,6 @@ setlocal
 
 set VENV_DIR=.venv
 set PYTHON=%VENV_DIR%\Scripts\python.exe
-set PYINSTALLER=%VENV_DIR%\Scripts\pyinstaller.exe
 
 if not exist "%PYTHON%" (
     echo ERROR: Virtual environment not found. Run scripts\install.bat first.
@@ -17,15 +16,14 @@ if not exist "%PYTHON%" (
 )
 
 echo [DictateAnywhere] Installing PyInstaller ...
-%PYTHON% -m pip install pyinstaller --quiet
+"%PYTHON%" -m pip install pyinstaller --quiet
 
 echo.
 echo [DictateAnywhere] Building executable ...
-%PYTHON% -m PyInstaller ^
+"%PYTHON%" -m PyInstaller ^
     --name "DictateAnywhere" ^
     --windowed ^
     --onedir ^
-    --icon "assets\icons\mic.ico" ^
     --add-data "assets;assets" ^
     --hidden-import "faster_whisper" ^
     --hidden-import "azure.cognitiveservices.speech" ^
@@ -46,9 +44,9 @@ if errorlevel 1 (
 )
 
 echo.
-echo ─────────────────────────────────────────────────────────────────────────────
+echo =============================================================================
 echo  Build complete!
 echo  Executable: dist\DictateAnywhere\DictateAnywhere.exe
-echo ─────────────────────────────────────────────────────────────────────────────
+echo =============================================================================
 echo.
 pause
