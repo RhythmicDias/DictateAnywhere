@@ -91,6 +91,7 @@ class DictateAnywhere:
 
         # ── State ──────────────────────────────────────────────────────────────
         self._dictating = False
+        self._continuous_session = False  # True = keep listening after each utterance
         self._timed_capture: Optional[TimedCapture] = None
         self._state_lock = threading.Lock()
 
@@ -188,9 +189,13 @@ class DictateAnywhere:
     # ── Dictation control ──────────────────────────────────────────────────────
 
     def _toggle_dictation(self) -> None:
-        if self._dictating:
+        if self._continuous_session:
+            # Second press — end the continuous session
+            self._continuous_session = False
             self._stop_dictation()
         else:
+            # First press — start a continuous session
+            self._continuous_session = True
             self._start_dictation()
 
     def _start_dictation(self) -> None:
@@ -199,7 +204,7 @@ class DictateAnywhere:
                 return
             self._dictating = True
 
-        logger.info("Dictation started")
+        logger.info("Dictation started (continuous=%s)", self._continuous_session)
         self._set_state("active")
 
         vad = VADFilter(aggressiveness=self._cfg.get("vad_aggressiveness", 2))
@@ -213,6 +218,7 @@ class DictateAnywhere:
         self._timed_capture.start()
 
     def _stop_dictation(self) -> None:
+        self._continuous_session = False
         with self._state_lock:
             if not self._dictating:
                 return
@@ -271,7 +277,14 @@ class DictateAnywhere:
         except Exception as exc:
             logger.exception("Transcription/injection error: %s", exc)
         finally:
-            self._set_state("idle")
+            # In continuous mode, restart listening immediately after each
+            # utterance so the user never has to press the hotkey again.
+            # _root.after() marshals the call onto the tkinter main thread.
+            if self._continuous_session:
+                logger.info("Continuous session — restarting dictation")
+                self._root.after(0, self._start_dictation)
+            else:
+                self._set_state("idle")
 
     def _run_hybrid_transcription(self, audio_bytes: bytes) -> str:
         """
