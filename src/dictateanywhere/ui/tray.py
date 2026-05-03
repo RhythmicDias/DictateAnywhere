@@ -66,6 +66,7 @@ class TrayIcon:
         on_open_settings: Callable,
         on_toggle_widget: Callable,
         on_toggle_preview: Callable,
+        on_open_history: Callable,
         on_quit: Callable,
         schedule_gui: Callable,         # thread-safe tk.after equivalent
     ) -> None:
@@ -74,6 +75,7 @@ class TrayIcon:
         self._on_settings = on_open_settings
         self._on_toggle_widget = on_toggle_widget
         self._on_toggle_preview = on_toggle_preview
+        self._on_history = on_open_history
         self._on_quit = on_quit
         self._schedule_gui = schedule_gui
 
@@ -103,6 +105,7 @@ class TrayIcon:
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("Toggle Floating Button",  self._menu_toggle_widget),
             pystray.MenuItem("Toggle Preview Overlay",  self._menu_toggle_preview),
+            pystray.MenuItem("Session History…",        self._menu_history),
             pystray.MenuItem("Settings…",               self._menu_settings),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("Quit",                    self._menu_quit),
@@ -160,6 +163,9 @@ class TrayIcon:
 
     def _menu_toggle_preview(self, icon, item) -> None:
         self._schedule_gui(self._on_toggle_preview)
+
+    def _menu_history(self, icon, item) -> None:
+        self._schedule_gui(self._on_history)
 
     def _menu_quit(self, icon, item) -> None:
         self._schedule_gui(self._on_quit)

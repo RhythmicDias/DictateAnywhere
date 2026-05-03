@@ -47,6 +47,7 @@ from .ui.tray import TrayIcon
 from .ui.floating_widget import FloatingWidget
 from .ui.settings_window import SettingsWindow
 from .ui.preview_window import PreviewWindow
+from .ui.history_window import HistoryWindow
 
 logger = logging.getLogger(__name__)
 
@@ -154,12 +155,15 @@ class DictateAnywhere:
             config_manager=self._cfg,
         )
 
+        self._history = HistoryWindow(root=self._root)
+
         self._tray = TrayIcon(
             on_start_dictation=self._start_dictation,
             on_stop_dictation=self._stop_dictation,
             on_open_settings=self._settings_win.open,
             on_toggle_widget=self._floating.toggle_visibility,
             on_toggle_preview=self._preview.toggle_visibility,
+            on_open_history=self._history.open,
             on_quit=self._quit,
             schedule_gui=self._schedule,
         )
@@ -287,8 +291,9 @@ class DictateAnywhere:
                 if text.strip():
                     logger.info("Injecting: %r", text[:80])
                     self._injector.inject(text + " ")
-                    # Show in preview overlay (must run on main thread)
+                    # Update overlay and history on main thread
                     self._root.after(0, self._preview.show_text, text.strip())
+                    self._root.after(0, self._history.add_entry, text.strip())
         except Exception as exc:
             logger.exception("Transcription/injection error: %s", exc)
         finally:
