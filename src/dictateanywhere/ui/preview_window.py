@@ -21,6 +21,7 @@ From worker threads, schedule via root.after(0, method).
 from __future__ import annotations
 
 import logging
+import math
 import tkinter as tk
 from collections import deque
 from typing import Optional
@@ -56,10 +57,12 @@ class PreviewWindow:
         self._hide_id:  Optional[str] = None
         self._drag_x    = 0
         self._drag_y    = 0
+        self._level: float = 0.0          # latest RMS from microphone (0.0–1.0)
         # widget refs (populated in _ensure_window)
-        self._status_lbl:   Optional[tk.Label] = None
-        self._text_labels:  list[tk.Label]     = []
-        self._text_frame:   Optional[tk.Frame] = None
+        self._status_lbl:   Optional[tk.Label]  = None
+        self._level_canvas: Optional[tk.Canvas] = None
+        self._text_labels:  list[tk.Label]      = []
+        self._text_frame:   Optional[tk.Frame]  = None
 
     # ── Public API (call on main thread) ──────────────────────────────────────
 
@@ -77,6 +80,8 @@ class PreviewWindow:
     def set_listening(self, active: bool) -> None:
         """Drive the Listening indicator without adding text."""
         self._listening = active
+        if not active:
+            self._level = 0.0   # reset meter when recording stops
         if not self._cfg.get("show_preview_window", True):
             return
         if active:
@@ -85,6 +90,12 @@ class PreviewWindow:
         self._refresh()
         if not active:
             self._schedule_auto_hide()
+
+    def set_level(self, rms: float) -> None:
+        """Update the live microphone level meter (called on the main thread)."""
+        self._level = rms
+        if self._listening and self._level_canvas:
+            self._draw_level()
 
     def toggle_visibility(self) -> None:
         """Show if hidden, hide if visible."""
@@ -143,6 +154,20 @@ class PreviewWindow:
         )
         self._status_lbl.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
+        # ── Level meter (16-segment LED bar) ──────────────────────────────
+        _METER_SEGS  = 16
+        _SEG_W       = 4
+        _SEG_GAP     = 1
+        _METER_W     = _METER_SEGS * (_SEG_W + _SEG_GAP) - _SEG_GAP
+        _METER_H     = 10
+        self._level_canvas = tk.Canvas(
+            header,
+            width=_METER_W, height=_METER_H,
+            bg=_HEADER_BG, highlightthickness=0,
+        )
+        self._level_canvas.pack(side=tk.RIGHT, padx=(0, 8), pady=0, anchor=tk.CENTER)
+        self._draw_level()
+
         close_btn = tk.Label(
             header, text="✕", font=("Segoe UI", 9),
             bg=_HEADER_BG, fg="#555555", cursor="hand2",
@@ -168,8 +193,8 @@ class PreviewWindow:
             lbl.pack(fill=tk.X, pady=1)
             self._text_labels.append(lbl)
 
-        # ── Drag bindings on header and status label ───────────────────────
-        for widget in (header, self._status_lbl):
+        # ── Drag bindings on header, status label, and level canvas ───────
+        for widget in (header, self._status_lbl, self._level_canvas):
             widget.bind("<ButtonPress-1>", self._drag_start)
             widget.bind("<B1-Motion>",     self._drag_motion)
 
@@ -195,6 +220,9 @@ class PreviewWindow:
             self._status_lbl.configure(text="DictateAnywhere preview",
                                         fg=_FG_HINT)
 
+        # Level meter — show active colours while listening, dim otherwise
+        self._draw_level()
+
         # Text rows — pad deque to _MAX_HISTORY with empty strings
         history  = list(self._history)
         padded   = [""] * (_MAX_HISTORY - len(history)) + history
@@ -218,6 +246,40 @@ class PreviewWindow:
             self._win.geometry(f"{_WIDTH}x{max(req_h, 60)}+{xp}+{yp}")
         except Exception:
             pass
+
+    # ── Level meter drawing ────────────────────────────────────────────────────
+
+    def _draw_level(self) -> None:
+        """Redraw the 16-segment LED bar to reflect self._level (RMS float32)."""
+        c = self._level_canvas
+        if not c:
+            return
+        c.delete("all")
+
+        _SEGS   = 16
+        _SEG_W  = 4
+        _SEG_GAP = 1
+        _H      = 10
+
+        # Log scale: maps 0 → 0, 0.01 → ~0.35, 0.06 → ~0.85, 0.1+ → 1.0
+        fraction = min(1.0, math.log10(1.0 + self._level * 150.0) / math.log10(151.0))
+        lit_count = int(fraction * _SEGS)
+
+        for i in range(_SEGS):
+            x0 = i * (_SEG_W + _SEG_GAP)
+            x1 = x0 + _SEG_W
+            if not self._listening:
+                colour = "#333333"   # all dim when idle
+            elif i < lit_count:
+                if i < 10:
+                    colour = "#4CAF50"   # green  — normal speech
+                elif i < 13:
+                    colour = "#FFC107"   # amber  — moderate
+                else:
+                    colour = "#FF5252"   # red    — loud / clipping risk
+            else:
+                colour = "#2a2a2a"       # unlit segment
+            c.create_rectangle(x0, 0, x1, _H, fill=colour, outline="")
 
     # ── Auto-hide timer ────────────────────────────────────────────────────────
 

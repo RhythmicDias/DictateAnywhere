@@ -241,6 +241,7 @@ class DictateAnywhere:
             device_index=self._cfg.get("mic_device_index", -1),
             silence_timeout_ms=self._cfg.get("silence_timeout_ms", 1500),
             max_seconds=self._cfg.get("max_record_seconds", 30),
+            on_level=lambda rms: self._root.after(0, self._preview.set_level, rms),
         )
         self._timed_capture.start()
 

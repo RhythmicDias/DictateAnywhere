@@ -167,10 +167,13 @@ class AudioCapture:
         sample_rate: int = TARGET_RATE,   # kept for API compat; ignored internally
         on_speech_start: Optional[Callable] = None,
         on_speech_end: Optional[Callable] = None,
+        on_level: Optional[Callable[[float], None]] = None,
     ) -> None:
         self._requested_device = None if device_index < 0 else device_index
         self._on_speech_start = on_speech_start
         self._on_speech_end = on_speech_end
+        self._on_level = on_level
+        self._last_level_time: float = 0.0   # throttle level callbacks to ~60 ms
 
         self._frame_queue: queue.Queue[bytes] = queue.Queue()
         self._all_frames: list[bytes] = []
@@ -325,6 +328,17 @@ class AudioCapture:
         self._all_frames.append(chunk_int16)
         self._frame_queue.put(chunk_int16)
 
+        # Level meter — throttled to ~60 ms so the UI isn't flooded
+        if self._on_level is not None:
+            now = time.monotonic()
+            if now - self._last_level_time >= 0.06:
+                self._last_level_time = now
+                rms = float(np.sqrt(np.mean(chunk ** 2)))
+                try:
+                    self._on_level(rms)
+                except Exception:
+                    pass
+
 
 # ---------------------------------------------------------------------------
 # TimedCapture
@@ -343,12 +357,14 @@ class TimedCapture:
         silence_timeout_ms: int = 1500,
         max_seconds: int = 30,
         sample_rate: int = TARGET_RATE,
+        on_level: Optional[Callable[[float], None]] = None,
     ) -> None:
         self._vad = vad
         self._on_complete = on_complete
         self._device_index = device_index
         self._silence_timeout = silence_timeout_ms / 1000.0
         self._max_seconds = max_seconds
+        self._on_level = on_level
 
         self._capture: Optional[AudioCapture] = None
         self._thread: Optional[threading.Thread] = None
@@ -358,7 +374,10 @@ class TimedCapture:
         if self._thread and self._thread.is_alive():
             return
         self._stop_event.clear()
-        self._capture = AudioCapture(device_index=self._device_index)
+        self._capture = AudioCapture(
+            device_index=self._device_index,
+            on_level=self._on_level,
+        )
         self._capture.start()
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
