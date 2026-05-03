@@ -48,6 +48,28 @@ from .ui.settings_window import SettingsWindow
 
 logger = logging.getLogger(__name__)
 
+# RMS energy threshold below which audio is treated as silence.
+# 0.004 ≈ -48 dBFS — well below normal speech (~-20 dBFS) but above
+# true silence. Adjust up if your mic is noisy, down if speech is quiet.
+_SPEECH_ENERGY_THRESHOLD = 0.004
+
+
+def _audio_has_speech_energy(audio_bytes: bytes, threshold: float = _SPEECH_ENERGY_THRESHOLD) -> bool:
+    """
+    Return True if the audio contains enough energy to likely be speech.
+
+    Uses RMS (root mean square) amplitude of the 16-bit PCM signal.
+    Prevents sending pure silence / low-level noise to Whisper, which
+    hallucinates common phrases like 'You' or 'Thank you' from silence.
+    """
+    if not audio_bytes:
+        return False
+    import numpy as np
+    arr = np.frombuffer(audio_bytes, dtype=np.int16).astype(np.float32) / 32768.0
+    rms = float(np.sqrt(np.mean(arr ** 2)))
+    logger.debug("Audio RMS energy: %.5f (threshold: %.4f)", rms, threshold)
+    return rms >= threshold
+
 
 class DictateAnywhere:
     """
@@ -226,6 +248,14 @@ class DictateAnywhere:
     def _transcribe_and_inject(self, audio_bytes: bytes) -> None:
         """Transcribe audio and inject result at cursor. Runs on a worker thread."""
         try:
+            # Gate: skip Whisper entirely if the audio is too quiet to be speech.
+            # This prevents Whisper hallucinations ("You", "Thank you", etc.)
+            # on near-silence recordings from background noise.
+            if not _audio_has_speech_energy(audio_bytes):
+                logger.info("Audio energy below threshold — skipping transcription")
+                self._set_state("idle")
+                return
+
             result = self._run_hybrid_transcription(audio_bytes)
             if result and result.strip():
                 text = clean_whisper_artifacts(result)
