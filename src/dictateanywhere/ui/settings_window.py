@@ -665,8 +665,20 @@ class _MicTestDialog:
         self._warn_lbl = ttk.Label(frm, textvariable=self._warn_var,
                                    foreground="#c0392b", wraplength=self._BAR_W,
                                    justify=tk.LEFT)
-        self._warn_lbl.pack(anchor=tk.W, pady=(0, pad))
+        self._warn_lbl.pack(anchor=tk.W, pady=(2, 0))
 
+        # ── Fix button (always shown — launches Windows Microphone privacy page) ─
+        fix_frm = ttk.Frame(frm)
+        fix_frm.pack(fill=tk.X, pady=(6, 0))
+        ttk.Label(fix_frm, text="If other apps can hear the mic but this one can't:",
+                  foreground="gray", font=("", 8)).pack(anchor=tk.W)
+        ttk.Button(fix_frm, text="Open Windows Microphone Privacy Settings",
+                   command=self._open_privacy_settings).pack(anchor=tk.W, pady=2)
+        ttk.Label(fix_frm,
+                  text='Enable  "Let desktop apps access your microphone"',
+                  foreground="#666666", font=("", 8)).pack(anchor=tk.W)
+
+        ttk.Separator(frm, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=(8, 4))
         ttk.Button(frm, text="Close", command=self._close).pack(anchor=tk.E)
 
     def _start_stream(self) -> None:
@@ -750,31 +762,43 @@ class _MicTestDialog:
 
         # Status text
         if rms < self._THRESH_NOISE:
-            status = "No signal detected — try speaking louder"
             fg = "#c0392b"
-            # Track how long signal has been flat
             if self._flat_since is None:
                 self._flat_since = time.monotonic()
-            elif time.monotonic() - self._flat_since >= self._WARN_FLAT_AFTER:
+                status = "No signal — speak now or check mic connections"
+            elif time.monotonic() - self._flat_since < self._WARN_FLAT_AFTER:
+                status = "Still no signal — is the microphone muted?"
+            else:
+                status = "No signal after several seconds — likely a privacy block"
                 self._warn_var.set(
-                    "Signal has been flat for several seconds.\n"
-                    "If your microphone is connected and unmuted, check:\n"
-                    "Windows Settings → Privacy & Security → Microphone\n"
-                    "→ 'Allow desktop apps to access your microphone' must be ON."
+                    "Windows is blocking microphone access for desktop apps.\n"
+                    "Click the button below to open Microphone Privacy Settings\n"
+                    "and turn ON  \"Let desktop apps access your microphone\".\n"
+                    "Then restart DictateAnywhere."
                 )
         elif rms < self._THRESH_SPEECH:
-            status = "Signal is very quiet — try speaking louder or increasing mic gain"
+            status = "Signal detected but very quiet — speak louder or raise mic gain"
             fg = "#e67e22"
             self._flat_since = None
             self._warn_var.set("")
         else:
-            status = "✓ Good signal — microphone is working"
+            status = "✓ Good signal — microphone is working correctly"
             fg = "#27ae60"
             self._flat_since = None
             self._warn_var.set("")
 
         self._status_var.set(status)
         self._status_lbl.config(foreground=fg)
+
+    @staticmethod
+    def _open_privacy_settings() -> None:
+        """Launch the Windows Microphone Privacy settings page directly."""
+        import subprocess
+        try:
+            # ms-settings URI — works on Windows 10 and 11
+            subprocess.Popen(["start", "ms-settings:privacy-microphone"], shell=True)
+        except Exception as exc:
+            logger.warning("Could not open privacy settings: %s", exc)
 
     def _close(self) -> None:
         self._running = False
