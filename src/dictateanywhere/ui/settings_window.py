@@ -8,6 +8,7 @@ The Azure API key is routed through SecureStorage (Windows Credential Manager).
 from __future__ import annotations
 
 import logging
+import os
 import shutil
 import threading
 import tkinter as tk
@@ -21,21 +22,31 @@ _PAD = 8
 _LABEL_W = 26
 
 # faster-whisper stores models here by default
-_WHISPER_CACHE_DIR = Path.home() / ".cache" / "huggingface" / "hub"
-# Model folder names created by faster-whisper / CTranslate2
 _WHISPER_MODEL_PREFIX = "models--Systran--faster-whisper-"
+
+
+def _get_whisper_cache_dir() -> Path:
+    """
+    Return the directory where this app's faster-whisper models are stored.
+    Mirrors the MODELS_DIR logic in local_engine.py:
+      %APPDATA%\\DictateAnywhere\\models  (Windows)
+      ~/Library/Application Support/DictateAnywhere/models  (macOS fallback)
+    """
+    base = os.environ.get("APPDATA") or Path.home() / "AppData" / "Roaming"
+    return Path(base) / "DictateAnywhere" / "models"
 
 
 def _find_whisper_models() -> list[dict]:
     """
     Return a list of dicts:
       { name, path, size_mb }
-    for each faster-whisper model found in the HuggingFace cache.
+    for each faster-whisper model found in the app's own models folder.
     """
+    cache_dir = _get_whisper_cache_dir()
     results = []
-    if not _WHISPER_CACHE_DIR.exists():
+    if not cache_dir.exists():
         return results
-    for folder in sorted(_WHISPER_CACHE_DIR.iterdir()):
+    for folder in sorted(cache_dir.iterdir()):
         if folder.is_dir() and folder.name.startswith(_WHISPER_MODEL_PREFIX):
             model_name = folder.name[len(_WHISPER_MODEL_PREFIX):]
             size_bytes  = sum(f.stat().st_size for f in folder.rglob("*") if f.is_file())
@@ -261,7 +272,7 @@ class SettingsWindow:
         ttk.Separator(f).pack(fill=tk.X, padx=_PAD, pady=_PAD)
         ttk.Label(f, text="Whisper model cache", font=("", 9, "bold")).pack(
             anchor=tk.W, padx=_PAD)
-        _hint(f, f"Models are stored in:\n{_WHISPER_CACHE_DIR}\n"
+        _hint(f, f"Models are stored in:\n{_get_whisper_cache_dir()}\n"
               "Deleting a model forces a fresh download on next use.")
 
         # Scrollable frame for model rows

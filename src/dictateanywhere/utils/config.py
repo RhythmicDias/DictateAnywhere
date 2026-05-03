@@ -46,8 +46,8 @@ class Config:
     # ── Audio ─────────────────────────────────────────────────────────────────
     mic_device_index: int = -1           # -1 = system default
     sample_rate: int = 16000            # Hz — Whisper expects 16 kHz
-    vad_aggressiveness: int = 2          # 0–3 (0=permissive, 3=aggressive)
-    silence_timeout_ms: int = 1500       # ms of silence before stopping capture
+    vad_aggressiveness: int = 1          # 0–3 (0=permissive, 3=aggressive)
+    silence_timeout_ms: int = 2500       # ms of silence before stopping capture
     max_record_seconds: int = 30         # hard cap per utterance
 
     # ── Hotkey ───────────────────────────────────────────────────────────────
