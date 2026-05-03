@@ -8,8 +8,10 @@ The Azure API key is routed through SecureStorage (Windows Credential Manager).
 from __future__ import annotations
 
 import logging
+import shutil
 import threading
 import tkinter as tk
+from pathlib import Path
 from tkinter import messagebox, ttk
 from typing import Callable, Optional
 
@@ -17,6 +19,29 @@ logger = logging.getLogger(__name__)
 
 _PAD = 8
 _LABEL_W = 26
+
+# faster-whisper stores models here by default
+_WHISPER_CACHE_DIR = Path.home() / ".cache" / "huggingface" / "hub"
+# Model folder names created by faster-whisper / CTranslate2
+_WHISPER_MODEL_PREFIX = "models--Systran--faster-whisper-"
+
+
+def _find_whisper_models() -> list[dict]:
+    """
+    Return a list of dicts:
+      { name, path, size_mb }
+    for each faster-whisper model found in the HuggingFace cache.
+    """
+    results = []
+    if not _WHISPER_CACHE_DIR.exists():
+        return results
+    for folder in sorted(_WHISPER_CACHE_DIR.iterdir()):
+        if folder.is_dir() and folder.name.startswith(_WHISPER_MODEL_PREFIX):
+            model_name = folder.name[len(_WHISPER_MODEL_PREFIX):]
+            size_bytes  = sum(f.stat().st_size for f in folder.rglob("*") if f.is_file())
+            size_mb     = size_bytes / (1024 * 1024)
+            results.append({"name": model_name, "path": folder, "size_mb": size_mb})
+    return results
 
 
 class SettingsWindow:
@@ -31,9 +56,9 @@ class SettingsWindow:
     def __init__(
         self,
         root: tk.Tk,
-        config_manager,          # ConfigManager instance
-        secure_storage,          # SecureStorage instance
-        on_save: Optional[Callable] = None,   # called after settings saved
+        config_manager,
+        secure_storage,
+        on_save: Optional[Callable] = None,
         hotkey_validator: Optional[Callable[[str], bool]] = None,
     ) -> None:
         self._root = root
@@ -46,7 +71,6 @@ class SettingsWindow:
     # ── Public API ─────────────────────────────────────────────────────────────
 
     def open(self) -> None:
-        """Build and display the settings window."""
         if self._win and self._win.winfo_exists():
             self._win.lift()
             self._win.focus_force()
@@ -64,7 +88,7 @@ class SettingsWindow:
         self._win = tk.Toplevel(self._root)
         self._win.title("DictateAnywhere — Settings")
         self._win.resizable(False, False)
-        self._win.grab_set()                      # modal
+        self._win.grab_set()
         self._win.protocol("WM_DELETE_WINDOW", self.close)
 
         nb = ttk.Notebook(self._win)
@@ -81,19 +105,13 @@ class SettingsWindow:
         self._build_tab_cloud(nb)
         self._build_tab_advanced(nb)
 
-        # Bottom bar
         bar = ttk.Frame(self._win)
         bar.pack(fill=tk.X, padx=_PAD, pady=(0, _PAD))
-        ttk.Label(bar, textvariable=self._status_var, foreground="gray").pack(
-            side=tk.LEFT
-        )
+        ttk.Label(bar, textvariable=self._status_var, foreground="gray").pack(side=tk.LEFT)
         ttk.Button(bar, text="Cancel", command=self.close).pack(side=tk.RIGHT, padx=4)
-        ttk.Button(bar, text="Save", command=self._save, style="Accent.TButton").pack(
-            side=tk.RIGHT
-        )
-        ttk.Button(bar, text="Reset Defaults", command=self._reset).pack(
-            side=tk.RIGHT, padx=4
-        )
+        ttk.Button(bar, text="Save", command=self._save,
+                   style="Accent.TButton").pack(side=tk.RIGHT)
+        ttk.Button(bar, text="Reset Defaults", command=self._reset).pack(side=tk.RIGHT, padx=4)
 
         self._win.update_idletasks()
         self._centre_window()
@@ -102,7 +120,6 @@ class SettingsWindow:
 
     def _build_tab_engine(self, nb: ttk.Notebook) -> None:
         f = self._tab(nb, "Engine")
-
         self._combo(f, "Engine mode", "engine_mode",
                     ["hybrid", "local", "cloud"],
                     "Hybrid uses local Whisper first; falls back to Azure if it fails.")
@@ -160,21 +177,15 @@ class SettingsWindow:
 
     def _build_tab_hotkey(self, nb: ttk.Notebook) -> None:
         f = self._tab(nb, "Hotkey")
-
         ttk.Label(f, text="Global hotkey", font=("", 9, "bold")).pack(
-            anchor=tk.W, padx=_PAD, pady=(_PAD, 2)
-        )
+            anchor=tk.W, padx=_PAD, pady=(_PAD, 2))
         _hint(f, "Works even when DictateAnywhere is in the background.\n"
               "Examples: ctrl+alt+d   ctrl+shift+space   f9")
-
         self._vars["hotkey"] = tk.StringVar(value=self._cfg.get("hotkey", "ctrl+alt+d"))
-        hk_entry = ttk.Entry(f, textvariable=self._vars["hotkey"], width=30)
-        hk_entry.pack(anchor=tk.W, padx=_PAD, pady=4)
-
+        ttk.Entry(f, textvariable=self._vars["hotkey"], width=30).pack(
+            anchor=tk.W, padx=_PAD, pady=4)
         ttk.Button(f, text="Test hotkey", command=self._test_hotkey).pack(
-            anchor=tk.W, padx=_PAD
-        )
-
+            anchor=tk.W, padx=_PAD)
         self._combo(f, "Hotkey mode", "hotkey_mode",
                     ["toggle", "push_to_talk"],
                     "Toggle: press once to start, again to stop.\n"
@@ -182,24 +193,20 @@ class SettingsWindow:
 
     def _build_tab_widget(self, nb: ttk.Notebook) -> None:
         f = self._tab(nb, "Floating Button")
-
         self._check(f, "Show floating mic button", "show_floating_widget")
         self._check(f, "Always on top", "widget_always_on_top")
         self._spin(f, "Button size (px)", "widget_size", 32, 128, 8,
                    "Width and height of the floating button in pixels.")
         self._scale(f, "Opacity", "widget_opacity", 0.1, 1.0, 0.05,
                     "1.0 = fully opaque; 0.1 = nearly transparent.")
-
         ttk.Separator(f).pack(fill=tk.X, padx=_PAD, pady=_PAD)
         ttk.Label(f, text="Button position will be saved automatically as you drag it.",
                   foreground="gray").pack(anchor=tk.W, padx=_PAD)
 
     def _build_tab_cloud(self, nb: ttk.Notebook) -> None:
         f = self._tab(nb, "Azure Cloud")
-
         ttk.Label(f, text="Azure Speech API Key", font=("", 9, "bold")).pack(
-            anchor=tk.W, padx=_PAD, pady=(_PAD, 2)
-        )
+            anchor=tk.W, padx=_PAD, pady=(_PAD, 2))
         _hint(f, "Stored securely in Windows Credential Manager (DPAPI encrypted).\n"
               "Never written to disk in plain text.\n"
               "Free tier: 5 hours/month — https://azure.microsoft.com/free/")
@@ -213,22 +220,18 @@ class SettingsWindow:
         self._key_entry = ttk.Entry(key_frame, textvariable=self._azure_key_var,
                                     width=48, show="•")
         self._key_entry.pack(side=tk.LEFT)
-        ttk.Button(key_frame, text="Show", command=self._toggle_key_visibility).pack(
-            side=tk.LEFT, padx=4
-        )
-        ttk.Button(key_frame, text="Clear", command=self._clear_azure_key).pack(
-            side=tk.LEFT
-        )
+        ttk.Button(key_frame, text="Show",
+                   command=self._toggle_key_visibility).pack(side=tk.LEFT, padx=4)
+        ttk.Button(key_frame, text="Clear",
+                   command=self._clear_azure_key).pack(side=tk.LEFT)
 
         self._combo(f, "Azure region", "cloud_region",
                     ["eastus", "westus", "westus2", "westeurope", "northeurope",
                      "southeastasia", "australiaeast", "canadacentral",
                      "uksouth", "japaneast", "centralindia", "brazilsouth"],
                     "Must match the region of your Azure Speech resource.")
-
         ttk.Button(f, text="Test Azure Connection",
                    command=self._test_azure).pack(anchor=tk.W, padx=_PAD, pady=_PAD)
-
         self._azure_test_label = ttk.Label(f, text="", foreground="gray")
         self._azure_test_label.pack(anchor=tk.W, padx=_PAD)
 
@@ -249,10 +252,92 @@ class SettingsWindow:
                     "Set to DEBUG to capture verbose logs for troubleshooting.")
 
         ttk.Separator(f).pack(fill=tk.X, padx=_PAD, pady=_PAD)
-        ttk.Label(f, text=f"Config file: {self._cfg.config_dir()}",
+        ttk.Label(f, text=f"Config folder:  {self._cfg.config_dir()}",
                   foreground="gray").pack(anchor=tk.W, padx=_PAD)
         ttk.Button(f, text="Open config folder",
                    command=self._open_config_dir).pack(anchor=tk.W, padx=_PAD, pady=4)
+
+        # ── Whisper model manager ────────────────────────────────────────────
+        ttk.Separator(f).pack(fill=tk.X, padx=_PAD, pady=_PAD)
+        ttk.Label(f, text="Whisper model cache", font=("", 9, "bold")).pack(
+            anchor=tk.W, padx=_PAD)
+        _hint(f, f"Models are stored in:\n{_WHISPER_CACHE_DIR}\n"
+              "Deleting a model forces a fresh download on next use.")
+
+        # Scrollable frame for model rows
+        self._model_frame = ttk.Frame(f)
+        self._model_frame.pack(fill=tk.X, padx=_PAD, pady=4)
+        self._refresh_model_list()
+
+        ttk.Button(f, text="↺  Refresh model list",
+                   command=self._refresh_model_list).pack(anchor=tk.W, padx=_PAD, pady=(0, 4))
+
+    # ── Whisper model helpers ─────────────────────────────────────────────────
+
+    def _refresh_model_list(self) -> None:
+        """Clear and repopulate the model rows inside _model_frame."""
+        for widget in self._model_frame.winfo_children():
+            widget.destroy()
+
+        models = _find_whisper_models()
+        if not models:
+            ttk.Label(self._model_frame,
+                      text="No downloaded models found.",
+                      foreground="gray").pack(anchor=tk.W)
+            return
+
+        # Header row
+        hdr = ttk.Frame(self._model_frame)
+        hdr.pack(fill=tk.X, pady=(0, 2))
+        ttk.Label(hdr, text="Model", width=14, font=("", 9, "bold")).pack(side=tk.LEFT)
+        ttk.Label(hdr, text="Size", width=8,  font=("", 9, "bold")).pack(side=tk.LEFT)
+        ttk.Label(hdr, text="Path",           font=("", 9, "bold")).pack(side=tk.LEFT, padx=4)
+
+        ttk.Separator(self._model_frame, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=2)
+
+        for m in models:
+            row = ttk.Frame(self._model_frame)
+            row.pack(fill=tk.X, pady=2)
+
+            # Model name
+            ttk.Label(row, text=m["name"], width=14).pack(side=tk.LEFT)
+            # Size
+            size_text = (f"{m['size_mb']:.0f} MB" if m["size_mb"] >= 1
+                         else f"{m['size_mb']*1024:.0f} KB")
+            ttk.Label(row, text=size_text, width=8, foreground="#555").pack(side=tk.LEFT)
+            # Path (truncated)
+            path_str = str(m["path"])
+            display_path = ("…" + path_str[-48:]) if len(path_str) > 50 else path_str
+            ttk.Label(row, text=display_path, foreground="gray",
+                      font=("Consolas", 8)).pack(side=tk.LEFT, padx=4)
+
+            # Delete button — capture current model in default arg
+            ttk.Button(
+                row, text="Delete",
+                command=lambda model=m: self._delete_model(model),
+            ).pack(side=tk.RIGHT)
+
+    def _delete_model(self, model: dict) -> None:
+        """Prompt and delete a downloaded Whisper model folder."""
+        confirmed = messagebox.askyesno(
+            "Delete model",
+            f"Delete the '{model['name']}' Whisper model ({model['size_mb']:.0f} MB)?\n\n"
+            f"Path:\n{model['path']}\n\n"
+            "The model will be re-downloaded automatically the next time it is needed.",
+            parent=self._win,
+        )
+        if not confirmed:
+            return
+        try:
+            shutil.rmtree(model["path"])
+            logger.info("Deleted Whisper model: %s", model["path"])
+            self._status_var.set(f"Deleted model '{model['name']}'.")
+        except Exception as exc:
+            logger.error("Failed to delete model %s: %s", model["path"], exc)
+            messagebox.showerror("Delete failed",
+                                 f"Could not delete model:\n{exc}",
+                                 parent=self._win)
+        self._refresh_model_list()
 
     # ── Widget helpers ────────────────────────────────────────────────────────
 
@@ -267,18 +352,14 @@ class SettingsWindow:
         var = tk.StringVar(value=str(self._cfg.get(key)))
         self._vars[key] = var
         ttk.Combobox(parent, textvariable=var, values=values,
-                     state="readonly", width=30).pack(
-            anchor=tk.W, padx=_PAD, pady=2
-        )
+                     state="readonly", width=30).pack(anchor=tk.W, padx=_PAD, pady=2)
         if hint:
             _hint(parent, hint)
 
     def _check(self, parent, label: str, key: str) -> None:
         var = tk.BooleanVar(value=bool(self._cfg.get(key)))
         self._vars[key] = var
-        ttk.Checkbutton(parent, text=label, variable=var).pack(
-            anchor=tk.W, padx=_PAD, pady=2
-        )
+        ttk.Checkbutton(parent, text=label, variable=var).pack(anchor=tk.W, padx=_PAD, pady=2)
 
     def _scale(self, parent, label: str, key: str,
                from_: float, to: float, resolution: float, hint: str = "") -> None:
@@ -286,9 +367,7 @@ class SettingsWindow:
         var = tk.DoubleVar(value=float(self._cfg.get(key)))
         self._vars[key] = var
         ttk.Scale(parent, variable=var, from_=from_, to=to,
-                  orient=tk.HORIZONTAL, length=300).pack(
-            anchor=tk.W, padx=_PAD, pady=2
-        )
+                  orient=tk.HORIZONTAL, length=300).pack(anchor=tk.W, padx=_PAD, pady=2)
         if hint:
             _hint(parent, hint)
 
@@ -298,9 +377,7 @@ class SettingsWindow:
         var = tk.IntVar(value=int(self._cfg.get(key)))
         self._vars[key] = var
         ttk.Spinbox(parent, textvariable=var, from_=from_, to=to,
-                    increment=increment, width=10).pack(
-            anchor=tk.W, padx=_PAD, pady=2
-        )
+                    increment=increment, width=10).pack(anchor=tk.W, padx=_PAD, pady=2)
         if hint:
             _hint(parent, hint)
 
@@ -316,13 +393,10 @@ class SettingsWindow:
             except Exception:
                 pass
 
-        # Resolve mic device index from label
         label = self._vars.get("mic_device_index_label")
         values = self._vars.get("mic_device_index_values")
         if label and values:
             lbl_str = label.get()
-            labels = (["Default"] +
-                      [f"[{v}] " for v in (values if isinstance(values, list) else [])])
             try:
                 if lbl_str == "Default":
                     data["mic_device_index"] = -1
@@ -332,7 +406,6 @@ class SettingsWindow:
             except Exception:
                 data["mic_device_index"] = -1
 
-        # Validate hotkey before saving
         if "hotkey" in data:
             from ..core.hotkey_manager import validate_hotkey
             if not validate_hotkey(str(data["hotkey"])):
@@ -344,7 +417,6 @@ class SettingsWindow:
                 )
                 return
 
-        # Save Azure key separately through secure storage
         raw_key = self._azure_key_var.get().strip()
         if raw_key and not raw_key.startswith("•"):
             ok = self._sec.store_azure_key(raw_key)
@@ -356,23 +428,18 @@ class SettingsWindow:
                     parent=self._win,
                 )
 
-        # Apply start-with-windows registry setting
         self._apply_startup(bool(data.get("start_with_windows", False)))
-
         self._cfg.update(data)
         self._cfg.save()
         self._status_var.set("Settings saved.")
         logger.info("Settings saved by user")
-
         if self._on_save:
             self._on_save()
 
     def _reset(self) -> None:
-        if messagebox.askyesno(
-            "Reset settings",
-            "Reset all settings to defaults? This cannot be undone.",
-            parent=self._win,
-        ):
+        if messagebox.askyesno("Reset settings",
+                               "Reset all settings to defaults? This cannot be undone.",
+                               parent=self._win):
             self._cfg.reset()
             self.close()
             self.open()
@@ -405,10 +472,10 @@ class SettingsWindow:
                 from ..transcription.cloud_engine import CloudEngine
                 engine = CloudEngine(api_key=key, region=region)
                 ok = engine.load()
-                if ok:
-                    msg, colour = f"✓ Azure Speech connected (region: {region})", "green"
-                else:
-                    msg, colour = "✗ Connection failed — check key and region.", "red"
+                msg, colour = (
+                    (f"✓ Azure Speech connected (region: {region})", "green") if ok
+                    else ("✗ Connection failed — check key and region.", "red")
+                )
             self._root.after(0, lambda: self._azure_test_label.config(
                 text=msg, foreground=colour))
 
@@ -427,12 +494,11 @@ class SettingsWindow:
 
     def _apply_startup(self, enabled: bool) -> None:
         try:
+            import sys
             import winreg
             key_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
             app_name = "DictateAnywhere"
-            import sys
             exe_path = f'"{sys.executable}" -m dictateanywhere'
-
             with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path,
                                 0, winreg.KEY_SET_VALUE) as key:
                 if enabled:
@@ -467,6 +533,5 @@ def _row(parent, label: str) -> ttk.Label:
 
 def _hint(parent, text: str) -> None:
     ttk.Label(parent, text=text, foreground="gray",
-              wraplength=400, justify=tk.LEFT).pack(
-        anchor=tk.W, padx=_PAD * 2, pady=(0, 6)
-    )
+              wraplength=420, justify=tk.LEFT).pack(
+        anchor=tk.W, padx=_PAD * 2, pady=(0, 6))
