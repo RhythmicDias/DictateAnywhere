@@ -199,16 +199,15 @@ class FloatingWidget:
 
         # ── Pulse ring (active state only) ──────────────────────────────────
         if state == "active" and pulse > 0:
-            pulse_alpha = math.sin(pulse * math.pi / 15)  # 0→1→0
+            # abs() keeps pulse_alpha in [0, 1] for all steps so colours stay valid
+            pulse_alpha = abs(math.sin(pulse * math.pi / 15))
             pulse_r = r + 4 + pulse_alpha * 6
-            pulse_opacity = int(80 * (1 - pulse_alpha))
-            if pulse_opacity > 0:
-                pulse_col = self._alpha_blend(ring, "#010101", pulse_alpha * 0.6)
-                c.create_oval(
-                    cx - pulse_r, cy - pulse_r,
-                    cx + pulse_r, cy + pulse_r,
-                    fill=pulse_col, outline="", width=0,
-                )
+            pulse_col = self._alpha_blend(ring, "#010101", pulse_alpha * 0.55)
+            c.create_oval(
+                cx - pulse_r, cy - pulse_r,
+                cx + pulse_r, cy + pulse_r,
+                fill=pulse_col, outline="", width=0,
+            )
 
         # ── Subtle drop shadow ───────────────────────────────────────────────
         shadow_r = r - 1
@@ -338,12 +337,15 @@ class FloatingWidget:
     @staticmethod
     def _alpha_blend(fg: str, bg: str, alpha: float) -> str:
         """Blend fg over bg with the given alpha (0=bg, 1=fg)."""
+        alpha = max(0.0, min(1.0, alpha))   # guard against out-of-range values
+
         def _parse(h: str):
             h = h.lstrip("#")
             return int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+
         fr, fg_, fb = _parse(fg)
         br, bg_, bb = _parse(bg)
-        r = int(fr * alpha + br * (1 - alpha))
-        g = int(fg_ * alpha + bg_ * (1 - alpha))
-        b = int(fb * alpha + bb * (1 - alpha))
+        r = max(0, min(255, int(fr * alpha + br * (1 - alpha))))
+        g = max(0, min(255, int(fg_ * alpha + bg_ * (1 - alpha))))
+        b = max(0, min(255, int(fb * alpha + bb * (1 - alpha))))
         return f"#{r:02x}{g:02x}{b:02x}"

@@ -75,20 +75,46 @@ class AudioCapture:
         self._all_frames.clear()
         self._recording = True
 
-        self._stream = sd.InputStream(
-            samplerate=self._sample_rate,
-            channels=CHANNELS,
-            dtype=DTYPE,
-            device=self._device,
-            blocksize=FRAME_SAMPLES,
-            callback=self._callback,
-        )
-        self._stream.start()
-        logger.info(
-            "Audio capture started — device=%s sr=%d",
-            self._device or "default",
-            self._sample_rate,
-        )
+        # Try the configured device first; fall back to system default on error.
+        devices_to_try: list = [self._device]
+        if self._device is not None:
+            devices_to_try.append(None)   # None = PortAudio default
+
+        last_exc: Optional[Exception] = None
+        for device in devices_to_try:
+            try:
+                self._stream = sd.InputStream(
+                    samplerate=self._sample_rate,
+                    channels=CHANNELS,
+                    dtype=DTYPE,
+                    device=device,
+                    blocksize=FRAME_SAMPLES,
+                    callback=self._callback,
+                )
+                self._stream.start()
+                logger.info(
+                    "Audio capture started — device=%s sr=%d",
+                    device if device is not None else "default",
+                    self._sample_rate,
+                )
+                return
+            except Exception as exc:
+                last_exc = exc
+                logger.warning("Could not open device %r: %s — trying next", device, exc)
+                try:
+                    if self._stream:
+                        self._stream.close()
+                except Exception:
+                    pass
+                self._stream = None
+
+        self._recording = False
+        raise RuntimeError(
+            f"Could not open any microphone.\n\n"
+            f"Last error: {last_exc}\n\n"
+            "Check that a microphone is connected, Windows audio is working,\n"
+            "and the app has microphone permission (Settings → Privacy → Microphone)."
+        ) from last_exc
 
     def stop(self) -> bytes:
         """
