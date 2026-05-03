@@ -129,13 +129,20 @@ def process(text: str, previous_text: str = "", apply_punctuation: bool = True,
 
 
 def clean_whisper_artifacts(text: str) -> str:
-    """Remove common Whisper hallucination patterns."""
+    """
+    Remove known Whisper hallucination patterns.
+
+    Only strip patterns that are *never* valid speech output:
+      - Bracketed/parenthesised noise tags like [Music] or (inaudible)
+      - A lone period (common silence hallucination)
+
+    Do NOT strip real words or phrases like "you" or "thank you" — those are
+    valid transcriptions that the user actually said.
+    """
     patterns = [
-        r"\[.*?\]",                    # [Music], [Applause]
-        r"\(.*?\)",                    # (inaudible)
-        r"^\s*thank you\s*\.?\s*$",   # lone "thank you" artefact
-        r"^\s*you\s*$",               # lone "you" artefact
-        r"^\s*\.\s*$",                # lone period
+        r"\[.*?\]",          # [Music], [Applause], [BLANK_AUDIO] …
+        r"\(.*?\)",          # (inaudible), (background noise) …
+        r"^\s*\.\s*$",       # lone period — silence artefact
     ]
     for pat in patterns:
         text = re.sub(pat, "", text, flags=re.IGNORECASE)

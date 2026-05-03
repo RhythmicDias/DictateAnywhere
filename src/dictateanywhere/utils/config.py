@@ -139,9 +139,32 @@ class ConfigManager:
             data = json.loads(self._path.read_text(encoding="utf-8"))
             self._config = Config.from_dict(data)
             logger.info("Config loaded from %s", self._path)
+            self._migrate()
         except (json.JSONDecodeError, TypeError, KeyError) as exc:
             logger.warning("Config corrupt (%s) — resetting to defaults", exc)
             self._config = Config()
+            self.save()
+
+    def _migrate(self) -> None:
+        """
+        One-time upgrades when old default values are detected on disk.
+        Safe to run on every load — only writes when a migration is needed.
+        """
+        changed = False
+
+        # v1.0 → v1.1: silence timeout increased 1500 → 2500 ms
+        if self._config.silence_timeout_ms == 1500:
+            self._config.silence_timeout_ms = 2500
+            logger.info("Config migrated: silence_timeout_ms 1500 → 2500")
+            changed = True
+
+        # v1.0 → v1.1: VAD aggressiveness reduced 2 → 1
+        if self._config.vad_aggressiveness == 2:
+            self._config.vad_aggressiveness = 1
+            logger.info("Config migrated: vad_aggressiveness 2 → 1")
+            changed = True
+
+        if changed:
             self.save()
 
     def reset(self) -> None:
