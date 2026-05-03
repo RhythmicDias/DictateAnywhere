@@ -684,21 +684,7 @@ class _MicTestDialog:
     def _start_stream(self) -> None:
         import sounddevice as sd
         import numpy as np
-
-        # Open at the device's native sample rate to avoid WASAPI silent-zero
-        # bug (requesting a non-native rate causes shared-mode WASAPI to return
-        # zeros without an error).  RMS metering only — no resampling needed.
-        try:
-            if self._device is not None:
-                dev_info = sd.query_devices(self._device)
-            else:
-                dev_info = sd.query_devices(kind="input")
-            native_rate = int(dev_info["default_samplerate"])
-        except Exception:
-            native_rate = self._SAMPLE_RATE
-
-        block_samples = int(native_rate * self._BLOCK_MS / 1000)
-        logger.info("Mic test: device=%r native_rate=%d", self._device, native_rate)
+        from ..audio.capture import _find_mme_input_devices, _mme_device_for_name, _get_device_native_rate
 
         def _callback(indata: np.ndarray, frames: int, time_info, status) -> None:
             if not self._running:
@@ -709,24 +695,57 @@ class _MicTestDialog:
             except Exception:
                 pass
 
+        # Build same MME-first candidate list as AudioCapture.start()
+        candidates: list[tuple] = []
         try:
-            self._stream = sd.InputStream(
-                samplerate=native_rate,
-                channels=1,
-                dtype="float32",
-                device=self._device,
-                blocksize=block_samples,
-                callback=_callback,
-            )
-            self._stream.start()
-            self._running = True
-        except Exception as exc:
-            logger.warning("Mic test stream failed: %s", exc)
-            self._status_var.set(f"Could not open microphone: {exc}")
-            self._warn_var.set(
-                "Could not open the microphone stream. Check that it is not\n"
-                "in exclusive use by another app (e.g. DAW, Zoom, Teams)."
-            )
+            if self._device is not None:
+                req_name = sd.query_devices(self._device)["name"]
+            else:
+                req_name = sd.query_devices(kind="input")["name"]
+            mme_match = _mme_device_for_name(req_name)
+            if mme_match is not None:
+                candidates.append((mme_match, self._SAMPLE_RATE, f"MME:{mme_match}"))
+        except Exception:
+            pass
+
+        for mme_idx in _find_mme_input_devices():
+            entry = (mme_idx, self._SAMPLE_RATE, f"MME:{mme_idx}")
+            if entry not in candidates:
+                candidates.append(entry)
+
+        native = _get_device_native_rate(self._device)
+        candidates.append((self._device, native, f"WASAPI:{self._device}"))
+        candidates.append((None, _get_device_native_rate(None), "WASAPI:default"))
+
+        for device, rate, label in candidates:
+            block_samples = int(rate * self._BLOCK_MS / 1000)
+            try:
+                self._stream = sd.InputStream(
+                    samplerate=rate,
+                    channels=1,
+                    dtype="float32",
+                    device=device,
+                    blocksize=block_samples,
+                    callback=_callback,
+                )
+                self._stream.start()
+                self._running = True
+                logger.info("Mic test stream opened: %s rate=%d", label, rate)
+                return
+            except Exception as exc:
+                logger.warning("Mic test %s failed: %s", label, exc)
+                try:
+                    if self._stream:
+                        self._stream.close()
+                except Exception:
+                    pass
+                self._stream = None
+
+        self._status_var.set("Could not open any microphone input.")
+        self._warn_var.set(
+            "All audio backends failed. Check that the microphone is\n"
+            "not in exclusive use by another app (DAW, Zoom, Teams)."
+        )
 
     def _schedule_update(self) -> None:
         if not self._win.winfo_exists():
