@@ -96,12 +96,9 @@ class LocalEngine(STTEngine):
                 beam_size=5,
                 best_of=5,
                 temperature=0.0,
-                vad_filter=True,
-                vad_parameters={
-                    "threshold": 0.5,
-                    "min_speech_duration_ms": 250,
-                    "min_silence_duration_ms": 500,
-                },
+                # vad_filter disabled: we pre-filter with webrtcvad before
+                # reaching this point, so double-VAD strips valid speech.
+                vad_filter=False,
                 word_timestamps=False,
                 condition_on_previous_text=True,
                 compression_ratio_threshold=2.4,

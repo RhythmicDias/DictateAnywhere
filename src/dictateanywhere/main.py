@@ -202,6 +202,17 @@ class DictateAnywhere:
 
     def _on_audio_ready(self, audio_bytes: bytes) -> None:
         """Called from the capture thread when audio is ready to transcribe."""
+        # If we used a fallback device, persist it so the warning doesn't repeat
+        if self._timed_capture is not None:
+            working = self._timed_capture.working_device
+            configured = self._cfg.get("mic_device_index", -1)
+            # working=None means system default (-1 in our convention)
+            working_idx = -1 if working is None else working
+            if working_idx != int(configured):
+                logger.info("Saving working audio device index: %s", working_idx)
+                self._cfg.update({"mic_device_index": working_idx})
+                self._cfg.save()
+
         with self._state_lock:
             self._dictating = False
         self._set_state("loading")

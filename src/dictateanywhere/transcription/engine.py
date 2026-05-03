@@ -92,5 +92,8 @@ class STTEngine(ABC):
                 result.duration_ms or 0,
                 result.text[:80],
             )
-        else:
+        elif result.error:
             logger.warning("[%s] failed: %s", self.name, result.error)
+        else:
+            # Empty text but no error — VAD filtered out everything (silence / no speech)
+            logger.info("[%s] no speech detected", self.name)

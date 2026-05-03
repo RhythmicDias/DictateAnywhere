@@ -65,6 +65,7 @@ class AudioCapture:
         self._stream: Optional[sd.InputStream] = None
         self._lock = threading.Lock()
         self._recording = False
+        self._working_device: Optional[int] = self._device  # updated if fallback used
 
     # ── Public API ─────────────────────────────────────────────────────────────
 
@@ -92,6 +93,7 @@ class AudioCapture:
                     callback=self._callback,
                 )
                 self._stream.start()
+                self._working_device = device   # remember what actually worked
                 logger.info(
                     "Audio capture started — device=%s sr=%d",
                     device if device is not None else "default",
@@ -154,6 +156,11 @@ class AudioCapture:
 
     def is_recording(self) -> bool:
         return self._recording
+
+    @property
+    def working_device(self) -> Optional[int]:
+        """The device index that successfully opened (None = system default)."""
+        return self._working_device
 
     # ── Internal ───────────────────────────────────────────────────────────────
 
@@ -240,3 +247,10 @@ class TimedCapture:
         audio = self._capture.stop()  # type: ignore[union-attr]
         if audio:
             self._on_complete(audio)
+
+    @property
+    def working_device(self) -> Optional[int]:
+        """Returns the device index that actually opened successfully."""
+        if self._capture is not None:
+            return self._capture.working_device
+        return None
