@@ -685,6 +685,21 @@ class _MicTestDialog:
         import sounddevice as sd
         import numpy as np
 
+        # Open at the device's native sample rate to avoid WASAPI silent-zero
+        # bug (requesting a non-native rate causes shared-mode WASAPI to return
+        # zeros without an error).  RMS metering only — no resampling needed.
+        try:
+            if self._device is not None:
+                dev_info = sd.query_devices(self._device)
+            else:
+                dev_info = sd.query_devices(kind="input")
+            native_rate = int(dev_info["default_samplerate"])
+        except Exception:
+            native_rate = self._SAMPLE_RATE
+
+        block_samples = int(native_rate * self._BLOCK_MS / 1000)
+        logger.info("Mic test: device=%r native_rate=%d", self._device, native_rate)
+
         def _callback(indata: np.ndarray, frames: int, time_info, status) -> None:
             if not self._running:
                 return
@@ -696,11 +711,11 @@ class _MicTestDialog:
 
         try:
             self._stream = sd.InputStream(
-                samplerate=self._SAMPLE_RATE,
+                samplerate=native_rate,
                 channels=1,
                 dtype="float32",
                 device=self._device,
-                blocksize=self._BLOCK_SAMPLES,
+                blocksize=block_samples,
                 callback=_callback,
             )
             self._stream.start()
@@ -709,10 +724,8 @@ class _MicTestDialog:
             logger.warning("Mic test stream failed: %s", exc)
             self._status_var.set(f"Could not open microphone: {exc}")
             self._warn_var.set(
-                "Tip: Check that a microphone is connected, not muted, and that\n"
-                "Windows has granted this app microphone permission:\n"
-                "Settings → Privacy & Security → Microphone → "
-                "Allow desktop apps to access your microphone"
+                "Could not open the microphone stream. Check that it is not\n"
+                "in exclusive use by another app (e.g. DAW, Zoom, Teams)."
             )
 
     def _schedule_update(self) -> None:
