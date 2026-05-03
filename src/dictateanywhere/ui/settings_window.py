@@ -170,13 +170,19 @@ class SettingsWindow:
         self._vars["mic_device_index_values"] = device_values  # type: ignore[assignment]
 
         _row(f, "Microphone").pack(fill=tk.X)
-        ttk.Combobox(
+        self._mic_combo = ttk.Combobox(
             f,
             textvariable=self._vars["mic_device_index_label"],
             values=device_labels,
             state="readonly",
             width=50,
-        ).pack(fill=tk.X, padx=_PAD, pady=2)
+        )
+        self._mic_combo.pack(fill=tk.X, padx=_PAD, pady=2)
+        self._mic_device_labels = device_labels
+        self._mic_device_values = device_values
+
+        ttk.Button(f, text="Test Mic", command=self._test_mic).pack(
+            anchor=tk.W, padx=_PAD, pady=(0, 4))
         _hint(f, "Restart DictateAnywhere after changing the microphone.")
 
         self._scale(f, "VAD aggressiveness", "vad_aggressiveness", 0, 3, 1,
@@ -469,6 +475,19 @@ class SettingsWindow:
                                  f"{combo.get()!r} is not a valid combination.",
                                  parent=self._win)
 
+    def _test_mic(self) -> None:
+        """Open the live microphone level meter dialog."""
+        # Resolve selected device index from the combobox
+        lbl_str = self._vars["mic_device_index_label"].get()
+        device_index: Optional[int] = None   # None = system default
+        if lbl_str != "Default":
+            try:
+                device_index = int(lbl_str.split("]")[0].lstrip("["))
+            except Exception:
+                device_index = None
+
+        _MicTestDialog(parent=self._win, device_index=device_index)
+
     def _test_azure(self) -> None:
         self._azure_test_label.config(text="Testing…", foreground="gray")
         self._win.update_idletasks()
@@ -546,3 +565,225 @@ def _hint(parent, text: str) -> None:
     ttk.Label(parent, text=text, foreground="gray",
               wraplength=420, justify=tk.LEFT).pack(
         anchor=tk.W, padx=_PAD * 2, pady=(0, 6))
+
+
+class _MicTestDialog:
+    """
+    Non-modal dialog that streams live audio from the selected microphone
+    and shows a real-time level meter.
+
+    Helps users diagnose:
+      - Microphone not producing audio (Windows privacy block, muted, wrong device)
+      - Mic too quiet (low gain)
+      - Mic working correctly
+    """
+
+    _BAR_W = 380
+    _BAR_H = 28
+    _UPDATE_MS = 80          # UI refresh interval
+    _WARN_FLAT_AFTER = 3.0   # seconds of flat signal before showing privacy warning
+    _SAMPLE_RATE = 16_000
+    _BLOCK_MS = 80           # sounddevice blocksize in ms
+    _BLOCK_SAMPLES = int(_SAMPLE_RATE * _BLOCK_MS / 1000)
+
+    # RMS thresholds (float32 normalised to ±1.0)
+    _THRESH_NOISE = 0.0005   # below this = effectively silent
+    _THRESH_SPEECH = 0.015   # above this = good speech level
+
+    def __init__(self, parent: tk.Toplevel, device_index: Optional[int]) -> None:
+        import queue as _queue
+        self._device = device_index
+        self._rms_queue: "_queue.Queue[float]" = _queue.Queue(maxsize=20)
+        self._stream = None
+        self._running = False
+        self._peak_rms: float = 0.0
+        self._flat_since: Optional[float] = None
+
+        self._win = tk.Toplevel(parent)
+        self._win.title("Test Microphone")
+        self._win.resizable(False, False)
+        self._win.grab_set()
+        self._win.protocol("WM_DELETE_WINDOW", self._close)
+
+        self._build_ui(device_index)
+        self._start_stream()
+        self._schedule_update()
+
+    def _build_ui(self, device_index: Optional[int]) -> None:
+        import sounddevice as sd
+        try:
+            if device_index is not None:
+                dev_name = sd.query_devices(device_index)["name"]
+            else:
+                dev_name = sd.query_devices(kind="input")["name"]
+        except Exception:
+            dev_name = "Default input device"
+
+        pad = _PAD
+        frm = ttk.Frame(self._win, padding=pad * 2)
+        frm.pack(fill=tk.BOTH, expand=True)
+
+        ttk.Label(frm, text="Microphone Level", font=("", 11, "bold")).pack(anchor=tk.W)
+        ttk.Label(frm, text=dev_name, foreground="gray").pack(anchor=tk.W, pady=(0, pad))
+
+        ttk.Label(frm, text="Speak into your microphone:", font=("", 9)).pack(anchor=tk.W)
+
+        # ── Level bar ──────────────────────────────────────────────────────────
+        bar_frame = ttk.Frame(frm, relief="sunken", borderwidth=1)
+        bar_frame.pack(fill=tk.X, pady=(4, 2))
+        self._canvas = tk.Canvas(bar_frame, width=self._BAR_W, height=self._BAR_H,
+                                 bg="#1e1e1e", highlightthickness=0)
+        self._canvas.pack()
+        self._bar = self._canvas.create_rectangle(
+            0, 0, 0, self._BAR_H, fill="#4caf50", outline="")
+        # Threshold markers
+        noise_x = int(self._BAR_W * self._THRESH_NOISE / 0.1)
+        speech_x = int(self._BAR_W * self._THRESH_SPEECH / 0.1)
+        self._canvas.create_line(noise_x, 0, noise_x, self._BAR_H,
+                                 fill="#ff9800", width=1, dash=(3, 3))
+        self._canvas.create_line(speech_x, 0, speech_x, self._BAR_H,
+                                 fill="#4caf50", width=1, dash=(3, 3))
+
+        # ── Numeric readout ────────────────────────────────────────────────────
+        num_row = ttk.Frame(frm)
+        num_row.pack(fill=tk.X, pady=(2, 0))
+        self._rms_var = tk.StringVar(value="RMS: –")
+        self._peak_var = tk.StringVar(value="Peak: –")
+        ttk.Label(num_row, textvariable=self._rms_var, font=("Consolas", 9)).pack(side=tk.LEFT)
+        ttk.Label(num_row, textvariable=self._peak_var, font=("Consolas", 9),
+                  foreground="gray").pack(side=tk.RIGHT)
+
+        # ── Status ─────────────────────────────────────────────────────────────
+        self._status_var = tk.StringVar(value="Listening…")
+        self._status_lbl = ttk.Label(frm, textvariable=self._status_var,
+                                     font=("", 9, "bold"), foreground="gray",
+                                     wraplength=self._BAR_W)
+        self._status_lbl.pack(anchor=tk.W, pady=(pad, 0))
+
+        # ── Privacy warning (hidden until triggered) ───────────────────────────
+        self._warn_var = tk.StringVar(value="")
+        self._warn_lbl = ttk.Label(frm, textvariable=self._warn_var,
+                                   foreground="#c0392b", wraplength=self._BAR_W,
+                                   justify=tk.LEFT)
+        self._warn_lbl.pack(anchor=tk.W, pady=(0, pad))
+
+        ttk.Button(frm, text="Close", command=self._close).pack(anchor=tk.E)
+
+    def _start_stream(self) -> None:
+        import sounddevice as sd
+        import numpy as np
+
+        def _callback(indata: np.ndarray, frames: int, time_info, status) -> None:
+            if not self._running:
+                return
+            rms = float(np.sqrt(np.mean(indata[:, 0].astype(np.float32) ** 2)))
+            try:
+                self._rms_queue.put_nowait(rms)
+            except Exception:
+                pass
+
+        try:
+            self._stream = sd.InputStream(
+                samplerate=self._SAMPLE_RATE,
+                channels=1,
+                dtype="float32",
+                device=self._device,
+                blocksize=self._BLOCK_SAMPLES,
+                callback=_callback,
+            )
+            self._stream.start()
+            self._running = True
+        except Exception as exc:
+            logger.warning("Mic test stream failed: %s", exc)
+            self._status_var.set(f"Could not open microphone: {exc}")
+            self._warn_var.set(
+                "Tip: Check that a microphone is connected, not muted, and that\n"
+                "Windows has granted this app microphone permission:\n"
+                "Settings → Privacy & Security → Microphone → "
+                "Allow desktop apps to access your microphone"
+            )
+
+    def _schedule_update(self) -> None:
+        if not self._win.winfo_exists():
+            return
+        self._update_bar()
+        self._win.after(self._UPDATE_MS, self._schedule_update)
+
+    def _update_bar(self) -> None:
+        import time
+
+        # Drain the queue, keep the latest RMS
+        rms = 0.0
+        while not self._rms_queue.empty():
+            try:
+                rms = self._rms_queue.get_nowait()
+            except Exception:
+                break
+
+        if not self._running:
+            return
+
+        self._peak_rms = max(self._peak_rms, rms)
+
+        # Scale bar: 0.0 → 0 px, 0.10 → full width (non-linear for visual clarity)
+        import math
+        if rms > 1e-9:
+            # log scale: map [0.0001, 0.1] → [0, BAR_W]
+            log_val = (math.log10(max(rms, 0.0001)) + 4) / 4   # -4..0 → 0..1
+            bar_px = max(0, min(self._BAR_W, int(log_val * self._BAR_W)))
+        else:
+            bar_px = 0
+
+        # Colour based on level
+        if rms < self._THRESH_NOISE:
+            colour = "#555555"
+        elif rms < self._THRESH_SPEECH:
+            colour = "#ff9800"   # orange = too quiet
+        else:
+            colour = "#4caf50"   # green = good
+
+        self._canvas.itemconfig(self._bar, fill=colour)
+        self._canvas.coords(self._bar, 0, 0, bar_px, self._BAR_H)
+
+        self._rms_var.set(f"RMS: {rms:.5f}")
+        self._peak_var.set(f"Peak: {self._peak_rms:.5f}")
+
+        # Status text
+        if rms < self._THRESH_NOISE:
+            status = "No signal detected — try speaking louder"
+            fg = "#c0392b"
+            # Track how long signal has been flat
+            if self._flat_since is None:
+                self._flat_since = time.monotonic()
+            elif time.monotonic() - self._flat_since >= self._WARN_FLAT_AFTER:
+                self._warn_var.set(
+                    "Signal has been flat for several seconds.\n"
+                    "If your microphone is connected and unmuted, check:\n"
+                    "Windows Settings → Privacy & Security → Microphone\n"
+                    "→ 'Allow desktop apps to access your microphone' must be ON."
+                )
+        elif rms < self._THRESH_SPEECH:
+            status = "Signal is very quiet — try speaking louder or increasing mic gain"
+            fg = "#e67e22"
+            self._flat_since = None
+            self._warn_var.set("")
+        else:
+            status = "✓ Good signal — microphone is working"
+            fg = "#27ae60"
+            self._flat_since = None
+            self._warn_var.set("")
+
+        self._status_var.set(status)
+        self._status_lbl.config(foreground=fg)
+
+    def _close(self) -> None:
+        self._running = False
+        if self._stream:
+            try:
+                self._stream.stop()
+                self._stream.close()
+            except Exception:
+                pass
+            self._stream = None
+        if self._win.winfo_exists():
+            self._win.destroy()
