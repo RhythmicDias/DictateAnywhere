@@ -14,6 +14,9 @@ if not exist "%PYTHON%" (
     exit /b 1
 )
 
+REM Add src\ to PYTHONPATH
+set PYTHONPATH=%~dp0..\src
+
 echo [DictateAnywhere] Installing pytest ...
 "%PYTHON%" -m pip install pytest --quiet
 

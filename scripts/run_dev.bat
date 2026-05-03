@@ -15,6 +15,9 @@ if not exist "%PYTHON%" (
     exit /b 1
 )
 
+REM Add src\ to PYTHONPATH so the app is found without needing "pip install -e ."
+set PYTHONPATH=%~dp0..\src
+
 echo [DictateAnywhere] Starting in development mode (console visible) ...
 "%PYTHON%" -m dictateanywhere
 pause

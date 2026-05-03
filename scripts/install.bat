@@ -16,15 +16,15 @@ if not exist "%PYTHON%" (
     exit /b 1
 )
 
-echo [DictateAnywhere] Step 1/3 — Upgrading pip, setuptools and wheel ...
-REM Must use "python -m pip" (not pip.exe directly) to avoid file-lock on Windows
+echo [DictateAnywhere] Step 1/2 — Upgrading pip, setuptools and wheel ...
+REM Must use "python -m pip" (not pip.exe) to avoid file-lock on Windows
 "%PYTHON%" -m pip install --upgrade pip setuptools wheel
 if errorlevel 1 (
     echo WARNING: Could not fully upgrade pip/setuptools/wheel — continuing anyway.
 )
 
 echo.
-echo [DictateAnywhere] Step 2/3 — Installing dependencies (prefer pre-built wheels) ...
+echo [DictateAnywhere] Step 2/2 — Installing dependencies (prefer pre-built wheels) ...
 "%PYTHON%" -m pip install --prefer-binary -r requirements.txt
 
 if errorlevel 1 (
@@ -32,20 +32,10 @@ if errorlevel 1 (
     echo ERROR: Dependency installation failed.
     echo.
     echo Common fixes:
-    echo   1. Make sure you are running Python 3.11 or 3.12 (64-bit^)
+    echo   1. Make sure you are running Python 3.11, 3.12, or 3.13 (64-bit^)
     echo      Check with: python --version
-    echo   2. Try running this command manually and check the output:
+    echo   2. Try running this command manually to see the full error:
     echo      %PYTHON% -m pip install --prefer-binary -r requirements.txt
-    pause
-    exit /b 1
-)
-
-echo.
-echo [DictateAnywhere] Step 3/3 — Installing DictateAnywhere package ...
-"%PYTHON%" -m pip install --no-build-isolation -e .
-
-if errorlevel 1 (
-    echo ERROR: Failed to install DictateAnywhere package.
     pause
     exit /b 1
 )
