@@ -48,26 +48,27 @@ from .ui.settings_window import SettingsWindow
 
 logger = logging.getLogger(__name__)
 
-# RMS energy threshold below which audio is treated as silence.
-# 0.004 ≈ -48 dBFS — well below normal speech (~-20 dBFS) but above
-# true silence. Adjust up if your mic is noisy, down if speech is quiet.
-_SPEECH_ENERGY_THRESHOLD = 0.004
+# RMS energy threshold below which audio is treated as true digital silence.
+# 0.0005 ≈ -66 dBFS — this only catches a completely dead signal.
+# Whisper's internal VAD (threshold=0.3) is the real hallucination guard.
+_SPEECH_ENERGY_THRESHOLD = 0.0005
 
 
 def _audio_has_speech_energy(audio_bytes: bytes, threshold: float = _SPEECH_ENERGY_THRESHOLD) -> bool:
     """
-    Return True if the audio contains enough energy to likely be speech.
+    Return True if the audio has any energy above true digital silence.
 
-    Uses RMS (root mean square) amplitude of the 16-bit PCM signal.
-    Prevents sending pure silence / low-level noise to Whisper, which
-    hallucinates common phrases like 'You' or 'Thank you' from silence.
+    Threshold is intentionally very low (0.0005) — we only want to skip
+    recordings that are a completely dead signal (e.g. mic unplugged).
+    Whisper's internal VAD handles near-silence hallucination suppression.
     """
     if not audio_bytes:
         return False
     import numpy as np
     arr = np.frombuffer(audio_bytes, dtype=np.int16).astype(np.float32) / 32768.0
     rms = float(np.sqrt(np.mean(arr ** 2)))
-    logger.debug("Audio RMS energy: %.5f (threshold: %.4f)", rms, threshold)
+    # Log at INFO so the user can see actual mic levels for calibration
+    logger.info("Audio RMS: %.5f (silence gate: %.4f)", rms, threshold)
     return rms >= threshold
 
 
