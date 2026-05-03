@@ -42,6 +42,7 @@ from .transcription.engine import EngineStatus
 from .core.hotkey_manager import HotkeyManager
 from .core.text_injector import TextInjector
 from .core.punctuation import process as process_text, clean_whisper_artifacts
+from .core.corrections import CorrectionsManager
 from .ui.tray import TrayIcon
 from .ui.floating_widget import FloatingWidget
 from .ui.settings_window import SettingsWindow
@@ -85,6 +86,9 @@ class DictateAnywhere:
         # ── Config & secrets ──────────────────────────────────────────────────
         self._cfg = ConfigManager()
         self._sec = SecureStorage()
+        self._corr = CorrectionsManager(
+            self._cfg.config_dir() / "corrections.json"
+        )
 
         _setup_logging(self._cfg.log_path(), self._cfg.get("log_level", "INFO"))
         logger.info("DictateAnywhere starting …")
@@ -141,6 +145,7 @@ class DictateAnywhere:
             config_manager=self._cfg,
             secure_storage=self._sec,
             on_save=self._on_settings_saved,
+            corrections_manager=self._corr,
         )
 
         self._tray = TrayIcon(
@@ -271,6 +276,7 @@ class DictateAnywhere:
                     apply_punctuation=self._cfg.get("spoken_punctuation", True),
                     apply_capitalise=self._cfg.get("auto_capitalise", True),
                 )
+                text = self._corr.apply(text)
                 if text.strip():
                     logger.info("Injecting: %r", text[:80])
                     self._injector.inject(text + " ")

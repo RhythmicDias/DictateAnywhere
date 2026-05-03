@@ -71,12 +71,14 @@ class SettingsWindow:
         secure_storage,
         on_save: Optional[Callable] = None,
         hotkey_validator: Optional[Callable[[str], bool]] = None,
+        corrections_manager=None,
     ) -> None:
         self._root = root
         self._cfg = config_manager
         self._sec = secure_storage
         self._on_save = on_save
         self._validate_hotkey = hotkey_validator
+        self._corrections = corrections_manager   # CorrectionsManager | None
         self._win: Optional[tk.Toplevel] = None
 
     # ── Public API ─────────────────────────────────────────────────────────────
@@ -115,6 +117,7 @@ class SettingsWindow:
         self._build_tab_widget(nb)
         self._build_tab_cloud(nb)
         self._build_tab_advanced(nb)
+        self._build_tab_corrections(nb)
 
         bar = ttk.Frame(self._win)
         bar.pack(fill=tk.X, padx=_PAD, pady=(0, _PAD))
@@ -288,6 +291,151 @@ class SettingsWindow:
 
         ttk.Button(f, text="↺  Refresh model list",
                    command=self._refresh_model_list).pack(anchor=tk.W, padx=_PAD, pady=(0, 4))
+
+    def _build_tab_corrections(self, nb: ttk.Notebook) -> None:
+        f = self._tab(nb, "Corrections")
+
+        ttk.Label(f, text="Word Corrections", font=("", 10, "bold")).pack(
+            anchor=tk.W, padx=_PAD, pady=(_PAD, 2))
+        _hint(f,
+              "Define replacements applied after every transcription.\n"
+              "Use these to fix Whisper mishearings or expand abbreviations.\n"
+              "Examples:  gonna → going to     acme → Acme Corp     thier → their\n"
+              "Matching is case-insensitive and whole-word.")
+
+        if self._corrections is None:
+            ttk.Label(f, text="Corrections manager not available.",
+                      foreground="gray").pack(anchor=tk.W, padx=_PAD)
+            return
+
+        # ── Scrollable corrections list ────────────────────────────────────
+        list_outer = ttk.Frame(f, relief="sunken", borderwidth=1)
+        list_outer.pack(fill=tk.BOTH, expand=True, padx=_PAD, pady=(4, 0))
+
+        canvas = tk.Canvas(list_outer, height=200, borderwidth=0,
+                           highlightthickness=0)
+        scrollbar = ttk.Scrollbar(list_outer, orient="vertical",
+                                  command=canvas.yview)
+        canvas.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        self._corr_inner = ttk.Frame(canvas)
+        self._corr_canvas_win = canvas.create_window(
+            (0, 0), window=self._corr_inner, anchor="nw")
+
+        def _on_resize(event):
+            canvas.itemconfig(self._corr_canvas_win, width=event.width)
+        canvas.bind("<Configure>", _on_resize)
+
+        def _update_scroll(event=None):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+        self._corr_inner.bind("<Configure>", _update_scroll)
+
+        # Mouse-wheel scrolling
+        def _on_wheel(event):
+            canvas.yview_scroll(-1 * (event.delta // 120), "units")
+        canvas.bind_all("<MouseWheel>", _on_wheel)
+
+        # Column headers
+        hdr = ttk.Frame(self._corr_inner)
+        hdr.pack(fill=tk.X, padx=4, pady=(4, 0))
+        ttk.Label(hdr, text="Whisper says (from)",
+                  font=("", 8, "bold"), width=22).pack(side=tk.LEFT)
+        ttk.Label(hdr, text="→", width=3).pack(side=tk.LEFT)
+        ttk.Label(hdr, text="Replace with (to)",
+                  font=("", 8, "bold")).pack(side=tk.LEFT)
+        ttk.Separator(self._corr_inner).pack(fill=tk.X, padx=4, pady=2)
+
+        self._corr_canvas = canvas
+        self._corr_rows_frame = ttk.Frame(self._corr_inner)
+        self._corr_rows_frame.pack(fill=tk.X)
+        self._corr_row_widgets: list[dict] = []
+        self._refresh_corrections()
+
+        # ── Add new correction row ─────────────────────────────────────────
+        ttk.Separator(f).pack(fill=tk.X, padx=_PAD, pady=(6, 2))
+        add_row = ttk.Frame(f)
+        add_row.pack(fill=tk.X, padx=_PAD, pady=(0, _PAD))
+        ttk.Label(add_row, text="From:", width=6).pack(side=tk.LEFT)
+        self._corr_from_var = tk.StringVar()
+        ttk.Entry(add_row, textvariable=self._corr_from_var,
+                  width=20).pack(side=tk.LEFT, padx=2)
+        ttk.Label(add_row, text="→").pack(side=tk.LEFT, padx=2)
+        ttk.Label(add_row, text="To:", width=4).pack(side=tk.LEFT)
+        self._corr_to_var = tk.StringVar()
+        ttk.Entry(add_row, textvariable=self._corr_to_var,
+                  width=22).pack(side=tk.LEFT, padx=2)
+        ttk.Button(add_row, text="Add", width=6,
+                   command=self._add_correction).pack(side=tk.LEFT, padx=4)
+
+        self._corr_status_var = tk.StringVar(value="")
+        ttk.Label(f, textvariable=self._corr_status_var,
+                  foreground="gray").pack(anchor=tk.W, padx=_PAD)
+
+    def _refresh_corrections(self) -> None:
+        """Rebuild the list of correction rows from the manager."""
+        for w in self._corr_rows_frame.winfo_children():
+            w.destroy()
+        self._corr_row_widgets.clear()
+
+        if self._corrections is None:
+            return
+
+        for i, (from_w, to_w) in enumerate(self._corrections.corrections):
+            row = ttk.Frame(self._corr_rows_frame)
+            row.pack(fill=tk.X, padx=4, pady=1)
+
+            from_var = tk.StringVar(value=from_w)
+            to_var = tk.StringVar(value=to_w)
+
+            ttk.Entry(row, textvariable=from_var, width=22,
+                      state="readonly").pack(side=tk.LEFT)
+            ttk.Label(row, text="→", width=3).pack(side=tk.LEFT)
+            ttk.Entry(row, textvariable=to_var, width=24,
+                      state="readonly").pack(side=tk.LEFT)
+            ttk.Button(
+                row, text="Delete", width=7,
+                command=lambda idx=i: self._delete_correction(idx),
+            ).pack(side=tk.LEFT, padx=4)
+
+            self._corr_row_widgets.append({"from": from_var, "to": to_var})
+
+        self._corr_rows_frame.update_idletasks()
+        if hasattr(self, "_corr_canvas"):
+            self._corr_canvas.configure(
+                scrollregion=self._corr_canvas.bbox("all"))
+
+    def _add_correction(self) -> None:
+        if self._corrections is None:
+            return
+        from_w = self._corr_from_var.get().strip()
+        to_w = self._corr_to_var.get().strip()
+        if not from_w:
+            self._corr_status_var.set("'From' cannot be empty.")
+            return
+        existing = self._corrections.corrections
+        if any(f.lower() == from_w.lower() for f, _ in existing):
+            self._corr_status_var.set(f"'{from_w}' already exists — delete it first.")
+            return
+        self._corrections.set_corrections(existing + [(from_w, to_w)])
+        self._corrections.save()
+        self._corr_from_var.set("")
+        self._corr_to_var.set("")
+        self._corr_status_var.set(f"Added: '{from_w}' → '{to_w}'")
+        self._refresh_corrections()
+
+    def _delete_correction(self, index: int) -> None:
+        if self._corrections is None:
+            return
+        existing = self._corrections.corrections
+        if 0 <= index < len(existing):
+            removed = existing[index]
+            new_list = [c for i, c in enumerate(existing) if i != index]
+            self._corrections.set_corrections(new_list)
+            self._corrections.save()
+            self._corr_status_var.set(f"Deleted: '{removed[0]}' → '{removed[1]}'")
+            self._refresh_corrections()
 
     # ── Whisper model helpers ─────────────────────────────────────────────────
 
