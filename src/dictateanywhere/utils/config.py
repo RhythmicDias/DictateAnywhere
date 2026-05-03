@@ -86,6 +86,10 @@ class Config:
     show_preview_window: bool = True     # show floating preview after dictation
     preview_hide_after_ms: int = 8000   # ms before overlay auto-hides (0 = never)
 
+    # ── Update checker ────────────────────────────────────────────────────────
+    last_update_check: str = ""          # ISO date (YYYY-MM-DD) of last check
+    skipped_update_version: str = ""    # release tag the user chose to skip
+
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 

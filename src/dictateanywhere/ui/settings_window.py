@@ -72,6 +72,7 @@ class SettingsWindow:
         on_save: Optional[Callable] = None,
         hotkey_validator: Optional[Callable[[str], bool]] = None,
         corrections_manager=None,
+        update_checker=None,
     ) -> None:
         self._root = root
         self._cfg = config_manager
@@ -79,6 +80,7 @@ class SettingsWindow:
         self._on_save = on_save
         self._validate_hotkey = hotkey_validator
         self._corrections = corrections_manager   # CorrectionsManager | None
+        self._updater   = update_checker          # UpdateChecker | None
         self._win: Optional[tk.Toplevel] = None
 
     # ── Public API ─────────────────────────────────────────────────────────────
@@ -282,6 +284,23 @@ class SettingsWindow:
         self._combo(f, "Log level", "log_level",
                     ["DEBUG", "INFO", "WARNING", "ERROR"],
                     "Set to DEBUG to capture verbose logs for troubleshooting.")
+
+        # ── Updates section ───────────────────────────────────────────────
+        ttk.Separator(f).pack(fill=tk.X, padx=_PAD, pady=_PAD)
+        ttk.Label(f, text="Updates", font=("", 9, "bold")).pack(
+            anchor=tk.W, padx=_PAD)
+        _hint(f, "DictateAnywhere checks GitHub Releases at most once per day.\n"
+              "No personal data is sent — it only reads the public releases API.")
+        self._check(f, "Check for updates automatically", "check_updates")
+
+        update_row = ttk.Frame(f)
+        update_row.pack(anchor=tk.W, padx=_PAD, pady=(4, 0))
+        self._update_btn = ttk.Button(update_row, text="Check now",
+                                      command=self._check_updates_now)
+        self._update_btn.pack(side=tk.LEFT)
+        self._update_result_var = tk.StringVar(value="")
+        ttk.Label(update_row, textvariable=self._update_result_var,
+                  foreground="gray").pack(side=tk.LEFT, padx=8)
 
         ttk.Separator(f).pack(fill=tk.X, padx=_PAD, pady=_PAD)
         ttk.Label(f, text=f"Config folder:  {self._cfg.config_dir()}",
@@ -704,6 +723,38 @@ class SettingsWindow:
     def _open_config_dir(self) -> None:
         import subprocess
         subprocess.Popen(["explorer", str(self._cfg.config_dir())])
+
+    def _check_updates_now(self) -> None:
+        """Trigger an immediate update check from the Settings window."""
+        if self._updater is None:
+            self._update_result_var.set("Update checker not available.")
+            return
+        self._update_btn.configure(state="disabled")
+        self._update_result_var.set("Checking…")
+
+        def _on_result(latest: str, url: str, is_newer: bool) -> None:
+            def _show():
+                self._update_btn.configure(state="normal")
+                if not latest:
+                    self._update_result_var.set("Could not reach GitHub — check your connection.")
+                    return
+                if is_newer:
+                    self._update_result_var.set(f"v{latest} available!")
+                    if messagebox.askyesno(
+                        "Update Available",
+                        f"DictateAnywhere {latest} is available.\n"
+                        f"You have {self._updater._current}.\n\n"
+                        "Open the releases page to download?",
+                        parent=self._win,
+                    ):
+                        import webbrowser
+                        webbrowser.open(url)
+                else:
+                    self._update_result_var.set(
+                        f"You're up to date (v{self._updater._current}).")
+            self._root.after(0, _show)
+
+        self._updater.check_now(_on_result)
 
     # ── Layout helpers ────────────────────────────────────────────────────────
 

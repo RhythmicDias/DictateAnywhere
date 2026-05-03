@@ -17,6 +17,7 @@ import os
 import sys
 import threading
 import tkinter as tk
+import webbrowser
 from pathlib import Path
 from typing import Optional
 
@@ -43,6 +44,8 @@ from .core.hotkey_manager import HotkeyManager
 from .core.text_injector import TextInjector
 from .core.punctuation import process as process_text, clean_whisper_artifacts
 from .core.corrections import CorrectionsManager
+from .core.updater import UpdateChecker
+from . import __version__ as _APP_VERSION
 from .ui.tray import TrayIcon
 from .ui.floating_widget import FloatingWidget
 from .ui.settings_window import SettingsWindow
@@ -91,6 +94,7 @@ class DictateAnywhere:
         self._corr = CorrectionsManager(
             self._cfg.config_dir() / "corrections.json"
         )
+        self._updater = UpdateChecker(self._cfg, current_version=_APP_VERSION)
 
         _setup_logging(self._cfg.log_path(), self._cfg.get("log_level", "INFO"))
         logger.info("DictateAnywhere starting …")
@@ -148,6 +152,7 @@ class DictateAnywhere:
             secure_storage=self._sec,
             on_save=self._on_settings_saved,
             corrections_manager=self._corr,
+            update_checker=self._updater,
         )
 
         self._preview = PreviewWindow(
@@ -185,6 +190,12 @@ class DictateAnywhere:
 
         if self._cfg.get("show_floating_widget", True):
             self._floating.show()
+
+        # Start background update check (15-second delay, once per day)
+        self._updater.start(
+            on_update_available=lambda latest, url:
+                self._root.after(0, self._show_update_dialog, latest, url)
+        )
 
         logger.info(
             "DictateAnywhere ready. Hotkey: %s | Engine: %s",
@@ -412,6 +423,48 @@ class DictateAnywhere:
         self._preview.set_listening(state == "active")
 
     # ── Widget moved ───────────────────────────────────────────────────────────
+
+    def _show_update_dialog(self, latest: str, url: str) -> None:
+        """Show a non-blocking update-available dialog on the main thread."""
+        win = tk.Toplevel(self._root)
+        win.title("Update Available")
+        win.geometry("460x210")
+        win.resizable(False, False)
+        win.lift()
+        win.grab_set()
+
+        from tkinter import ttk as _ttk
+
+        _ttk.Label(
+            win,
+            text=f"DictateAnywhere {latest} is available!",
+            font=("Segoe UI", 12, "bold"),
+        ).pack(pady=(20, 4))
+        _ttk.Label(
+            win,
+            text=f"You have v{_APP_VERSION}.",
+            foreground="gray",
+        ).pack()
+        _ttk.Label(
+            win,
+            text="Visit GitHub Releases to download the latest installer.",
+            foreground="gray",
+        ).pack(pady=(4, 16))
+
+        btns = _ttk.Frame(win)
+        btns.pack(pady=(0, 20))
+
+        def _download():
+            webbrowser.open(url)
+            win.destroy()
+
+        def _skip():
+            self._updater.skip_version(latest)
+            win.destroy()
+
+        _ttk.Button(btns, text="Download",          command=_download).pack(side=tk.LEFT, padx=6)
+        _ttk.Button(btns, text="Skip this version", command=_skip   ).pack(side=tk.LEFT, padx=6)
+        _ttk.Button(btns, text="Remind me later",   command=win.destroy).pack(side=tk.LEFT, padx=6)
 
     def _on_widget_moved(self, x: int, y: int) -> None:
         self._cfg.set("widget_x", x)
