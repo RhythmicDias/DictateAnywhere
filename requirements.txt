@@ -3,7 +3,8 @@ sounddevice==0.5.1
 numpy==1.26.4
 
 # ─── Voice Activity Detection ─────────────────────────────────────────────────
-webrtcvad==2.0.10
+# webrtcvad-wheels ships pre-built binaries for Windows — no C compiler needed.
+webrtcvad-wheels==2.0.14
 
 # ─── Local STT (offline) ──────────────────────────────────────────────────────
 faster-whisper==1.0.3
@@ -16,7 +17,8 @@ keyring==25.2.1
 
 # ─── System tray icon ─────────────────────────────────────────────────────────
 pystray==0.19.5
-Pillow==10.3.0
+# Pillow: pinned to a release with official Windows wheels — no build tools needed.
+Pillow==10.4.0
 
 # ─── Global hotkeys ───────────────────────────────────────────────────────────
 keyboard==0.13.5
@@ -24,6 +26,3 @@ keyboard==0.13.5
 # ─── Windows text injection / clipboard ───────────────────────────────────────
 pywin32==306
 pyperclip==1.9.0
-
-# ─── Startup on boot ──────────────────────────────────────────────────────────
-winreg; sys_platform == "win32"

@@ -16,35 +16,44 @@ if not exist "%VENV_DIR%\Scripts\python.exe" (
     exit /b 1
 )
 
-echo [DictateAnywhere] Upgrading pip ...
-%PIP% install --upgrade pip
-
-echo.
-echo [DictateAnywhere] Installing dependencies ...
-%PIP% install -r requirements.txt
-
+echo [DictateAnywhere] Step 1/3 — Upgrading pip, setuptools and wheel ...
+%PIP% install --upgrade pip setuptools wheel
 if errorlevel 1 (
-    echo.
-    echo ERROR: Dependency installation failed.
-    echo Check the error above. Common fixes:
-    echo   - Make sure Microsoft C++ Build Tools are installed
-    echo   - Try: pip install --upgrade setuptools wheel
+    echo ERROR: Could not upgrade pip/setuptools/wheel.
     pause
     exit /b 1
 )
 
 echo.
-echo [DictateAnywhere] Installing DictateAnywhere in editable mode ...
-%PIP% install -e .
+echo [DictateAnywhere] Step 2/3 — Installing dependencies (prefer pre-built wheels) ...
+%PIP% install --prefer-binary -r requirements.txt
+
+if errorlevel 1 (
+    echo.
+    echo ERROR: Dependency installation failed.
+    echo.
+    echo Common fixes:
+    echo   1. Make sure you are running Python 3.11 or 3.12 (64-bit)
+    echo      Check with: python --version
+    echo   2. If azure-cognitiveservices-speech fails, try manually:
+    echo      .venv\Scripts\pip install azure-cognitiveservices-speech --prefer-binary
+    echo   3. If faster-whisper fails, try:
+    echo      .venv\Scripts\pip install faster-whisper --prefer-binary
+    pause
+    exit /b 1
+)
 
 echo.
-echo ─────────────────────────────────────────────────────────────────────────────
+echo [DictateAnywhere] Step 3/3 — Installing DictateAnywhere package ...
+%PIP% install --no-build-isolation -e .
+
+echo.
+echo =============================================================================
 echo  Installation complete!
 echo.
 echo  To run DictateAnywhere:
-echo    %VENV_DIR%\Scripts\python.exe -m dictateanywhere
-echo.
-echo  Or use the shortcut:  scripts\run.bat
-echo ─────────────────────────────────────────────────────────────────────────────
+echo    scripts\run.bat          (no console window — tray app)
+echo    scripts\run_dev.bat      (with console for debugging)
+echo =============================================================================
 echo.
 pause

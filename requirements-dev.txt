@@ -1,4 +1,6 @@
 # Development dependencies (not required at runtime)
+# Install all runtime deps first (prefer pre-built wheels)
+# pip install --prefer-binary -r requirements-dev.txt
 -r requirements.txt
 
 # Testing
