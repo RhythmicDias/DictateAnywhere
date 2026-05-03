@@ -1,0 +1,77 @@
+# ─── Python ───────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+var/
+sdist/
+develop-eggs/
+.installed.cfg
+lib/
+lib64/
+MANIFEST
+
+# ─── Virtual environment ──────────────────────────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+.env
+
+# ─── Distribution / packaging ─────────────────────────────────────────────────
+*.manifest
+*.spec.bak
+
+# ─── PyInstaller output ───────────────────────────────────────────────────────
+dist/
+build/
+*.spec
+
+# ─── IDE & editors ────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ─── Testing ──────────────────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# ─── Logs ─────────────────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ─── User config & secrets (NEVER commit these) ───────────────────────────────
+config.json
+*.key
+*.pem
+secrets.txt
+
+# ─── Downloaded Whisper models (can be large) ─────────────────────────────────
+models/
+*.bin
+*.pt
+*.onnx
+
+# ─── Windows artifacts ────────────────────────────────────────────────────────
+*.exe
+*.msi
+*.dll
+
+# ─── Type checking ────────────────────────────────────────────────────────────
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyright/
