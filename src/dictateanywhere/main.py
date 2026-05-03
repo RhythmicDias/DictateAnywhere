@@ -421,6 +421,11 @@ class DictateAnywhere:
         self._tray.set_state(state)
         self._floating.set_state(state)
         self._preview.set_listening(state == "active")
+        if state == "active":
+            self._floating.start_countdown(
+                float(self._cfg.get("max_record_seconds", 30)))
+        else:
+            self._floating.stop_countdown()
 
     # ── Widget moved ───────────────────────────────────────────────────────────
 

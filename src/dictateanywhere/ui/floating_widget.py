@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import logging
 import math
+import time
 import tkinter as tk
 from typing import Callable, Optional
 
@@ -55,6 +56,11 @@ class FloatingWidget:
         self._state = "idle"
         self._pulse_step = 0
         self._pulse_after: Optional[str] = None
+
+        # Countdown ring state
+        self._countdown_start: float = 0.0
+        self._countdown_max:   float = 30.0
+        self._counting_down:   bool  = False
 
         # Transparent top-level window (no border, no title bar)
         self._win = tk.Toplevel(root)
@@ -156,6 +162,18 @@ class FloatingWidget:
         except Exception:
             pass
 
+    # ── Countdown ring ─────────────────────────────────────────────────────────
+
+    def start_countdown(self, max_seconds: float = 30.0) -> None:
+        """Begin the recording countdown ring. Call when recording starts."""
+        self._countdown_max   = max(1.0, max_seconds)
+        self._countdown_start = time.monotonic()
+        self._counting_down   = True
+
+    def stop_countdown(self) -> None:
+        """Clear the countdown ring. Call when recording ends."""
+        self._counting_down = False
+
     # ── Pulse animation (recording state) ─────────────────────────────────────
 
     def _start_pulse(self) -> None:
@@ -174,12 +192,16 @@ class FloatingWidget:
         if self._state != "active":
             return
         self._pulse_step = (self._pulse_step + 1) % 30
-        self._draw(state="active", pulse=self._pulse_step)
+        elapsed = (
+            time.monotonic() - self._countdown_start
+            if self._counting_down else 0.0
+        )
+        self._draw(state="active", pulse=self._pulse_step, elapsed=elapsed)
         self._pulse_after = self._root.after(50, self._animate_pulse)
 
     # ── Drawing ───────────────────────────────────────────────────────────────
 
-    def _draw(self, state: str = "idle", pulse: int = 0) -> None:
+    def _draw(self, state: str = "idle", pulse: int = 0, elapsed: float = 0.0) -> None:
         c = self._canvas
         s = self._size
         c.delete("all")
@@ -199,7 +221,6 @@ class FloatingWidget:
 
         # ── Pulse ring (active state only) ──────────────────────────────────
         if state == "active" and pulse > 0:
-            # abs() keeps pulse_alpha in [0, 1] for all steps so colours stay valid
             pulse_alpha = abs(math.sin(pulse * math.pi / 15))
             pulse_r = r + 4 + pulse_alpha * 6
             pulse_col = self._alpha_blend(ring, "#010101", pulse_alpha * 0.55)
@@ -220,6 +241,59 @@ class FloatingWidget:
         # ── Main circle ─────────────────────────────────────────────────────
         c.create_oval(cx - r, cy - r, cx + r, cy + r,
                       fill=bg, outline=ring, width=max(1, s // 32))
+
+        # ── Countdown ring (active state while recording) ───────────────────
+        if state == "active" and self._counting_down and self._countdown_max > 0:
+            remaining = max(0.0, self._countdown_max - elapsed)
+            fraction  = remaining / self._countdown_max    # 1.0 → 0.0
+            sweep_deg = fraction * 360.0
+
+            # Color shifts: green → amber → red as time runs out
+            if fraction > 0.50:
+                arc_col = "#4CAF50"   # green
+            elif fraction > 0.20:
+                arc_col = "#FFC107"   # amber
+            else:
+                arc_col = "#FF5252"   # red
+
+            ring_r = r - 3                        # just inside the circle edge
+            ring_w = max(3, s // 20)
+
+            # Background track — full dim circle
+            c.create_arc(
+                cx - ring_r, cy - ring_r,
+                cx + ring_r, cy + ring_r,
+                start=90, extent=-359.9,
+                style=tk.ARC,
+                outline=self._alpha_blend(arc_col, bg, 0.20),
+                width=ring_w,
+            )
+
+            # Remaining-time arc — sweeps clockwise from 12 o'clock
+            if sweep_deg > 1.0:
+                c.create_arc(
+                    cx - ring_r, cy - ring_r,
+                    cx + ring_r, cy + ring_r,
+                    start=90,
+                    extent=-min(sweep_deg, 359.9),
+                    style=tk.ARC,
+                    outline=arc_col,
+                    width=ring_w,
+                )
+
+            # Seconds label — top of button, above the mic icon
+            secs_left = int(math.ceil(remaining))
+            font_size = max(7, s // 9)
+            # Only show text when button is large enough and time is running short
+            if s >= 48:
+                label_y = cy - r * 0.60
+                c.create_text(
+                    cx, label_y,
+                    text=f"{secs_left}s",
+                    fill=arc_col,
+                    font=("Segoe UI", font_size, "bold"),
+                    anchor=tk.CENTER,
+                )
 
         # ── Inner highlight arc (gives a glossy pill effect) ────────────────
         hr = r * 0.72
