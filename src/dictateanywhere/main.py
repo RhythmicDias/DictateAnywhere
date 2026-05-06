@@ -17,6 +17,7 @@ import os
 import sys
 import threading
 import tkinter as tk
+from tkinter import ttk
 import webbrowser
 from pathlib import Path
 from typing import Optional
@@ -39,6 +40,7 @@ from .audio.capture import TimedCapture
 from .audio.vad import VADFilter
 from .transcription.local_engine import LocalEngine
 from .transcription.cloud_engine import CloudEngine
+from .transcription.sarvam_engine import SarvamEngine
 from .transcription.engine import EngineStatus
 from .core.hotkey_manager import HotkeyManager
 from .core.text_injector import TextInjector
@@ -104,6 +106,7 @@ class DictateAnywhere:
         self._continuous_session = False  # True = keep listening after each utterance
         self._timed_capture: Optional[TimedCapture] = None
         self._state_lock = threading.Lock()
+        self._previous_text = ""
 
         # ── Tkinter root (hidden — we only need the event loop) ───────────────
         self._root = tk.Tk()
@@ -129,6 +132,11 @@ class DictateAnywhere:
             api_key=self._sec.get_azure_key(),
             region=self._cfg.get("cloud_region", "eastus"),
             language=self._cfg.get("language", "en"),
+        )
+        self._sarvam_engine = SarvamEngine(
+            api_key=self._sec.get_sarvam_key(),
+            model=self._cfg.get("sarvam_model", "saarika:v2.5"),
+            language=self._cfg.get("sarvam_language", "hi-IN"),
         )
 
         # Load local engine in background so startup is instant
@@ -234,13 +242,17 @@ class DictateAnywhere:
         logger.info("Dictation started (continuous=%s)", self._continuous_session)
         self._set_state("active")
 
+        # Recording limit logic
+        enable_limit = self._cfg.get("enable_max_record_limit", True)
+        max_sec = self._cfg.get("max_record_seconds", 30) if enable_limit else 3600
+
         vad = VADFilter(aggressiveness=self._cfg.get("vad_aggressiveness", 2))
         self._timed_capture = TimedCapture(
             vad=vad,
             on_complete=self._on_audio_ready,
             device_index=self._cfg.get("mic_device_index", -1),
             silence_timeout_ms=self._cfg.get("silence_timeout_ms", 1500),
-            max_seconds=self._cfg.get("max_record_seconds", 30),
+            max_seconds=max_sec,
             on_level=lambda rms: self._root.after(0, self._preview.set_level, rms),
         )
         self._timed_capture.start()
@@ -296,16 +308,38 @@ class DictateAnywhere:
                 text = clean_whisper_artifacts(result)
                 text = process_text(
                     text,
+                    previous_text=self._previous_text,
                     apply_punctuation=self._cfg.get("spoken_punctuation", True),
                     apply_capitalise=self._cfg.get("auto_capitalise", True),
                 )
                 text = self._corr.apply(text)
-                if text.strip():
+                
+                # Polish text using LLM if enabled
+                if self._cfg.get("enable_polish", False):
+                    provider = self._cfg.get("polish_provider", "none")
+                    if provider == "ollama":
+                        self._root.after(0, self._preview.show_text, "✨ Polishing with Ollama...")
+                        from .core.polish import polish_text_ollama
+                        ollama_url = self._cfg.get("ollama_url", "http://localhost:11434")
+                        ollama_model = self._cfg.get("polish_ollama_model", "llama3")
+                        action = self._cfg.get("polish_action", "Fix Grammar & Spelling")
+                        
+                        logger.info("Polishing text using Ollama model %s with action: %s", ollama_model, action)
+                        text = polish_text_ollama(text, ollama_url, ollama_model, action)
+                
+                # Strip text completely to remove any leading spaces from Whisper
+                text = text.strip()
+                if text:
                     logger.info("Injecting: %r", text[:80])
+                    # Inject with exactly ONE trailing space to separate continuous chunks
                     self._injector.inject(text + " ")
+                    
+                    # Update our rolling context so the next chunk capitalizes correctly
+                    self._previous_text = text + " "
+                    
                     # Update overlay and history on main thread
-                    self._root.after(0, self._preview.show_text, text.strip())
-                    self._root.after(0, self._history.add_entry, text.strip())
+                    self._root.after(0, self._preview.show_text, text)
+                    self._root.after(0, self._history.add_entry, text)
         except Exception as exc:
             logger.exception("Transcription/injection error: %s", exc)
         finally:
@@ -330,6 +364,9 @@ class DictateAnywhere:
 
         if mode == "cloud":
             return self._cloud_transcribe(audio_bytes, lang)
+
+        if mode == "sarvam":
+            return self._sarvam_transcribe(audio_bytes, lang)
 
         if mode == "local":
             return self._local_transcribe(audio_bytes, lang)
@@ -358,6 +395,15 @@ class DictateAnywhere:
                 api_key, self._cfg.get("cloud_region", "eastus")
             )
         r = self._cloud_engine.transcribe(audio_bytes, language=lang)
+        return r.text if r.success else ""
+
+    def _sarvam_transcribe(self, audio_bytes: bytes, lang: str) -> str:
+        key = self._sec.get_sarvam_key()
+        if not key:
+            logger.warning("Sarvam API key not configured — sarvam unavailable")
+            return ""
+        self._sarvam_engine.update_credentials(key)
+        r = self._sarvam_engine.transcribe(audio_bytes, language=lang)
         return r.text if r.success else ""
 
     # ── Model loading ──────────────────────────────────────────────────────────
@@ -398,16 +444,19 @@ class DictateAnywhere:
             self._floating.hide()
 
         # Engines: reload if model changed
-        if (cfg.model_size != self._local_engine._model_size or
-                cfg.compute_type != self._local_engine._compute_type):
+        if (cfg.model_size != self._local_engine.model_size or
+                cfg.compute_type != self._local_engine.compute_type):
             self._local_engine.set_model_size(cfg.model_size)
-            self._local_engine._compute_type = cfg.compute_type
+            self._local_engine.set_compute_type(cfg.compute_type)
             threading.Thread(target=self._load_local_engine, daemon=True).start()
 
         # Azure key might have changed
         self._cloud_engine.update_credentials(
-            self._sec.get_azure_key() or "",
-            cfg.cloud_region,
+            self._sec.get_azure_key(),
+            self._cfg.get("cloud_region", "eastus")
+        )
+        self._sarvam_engine.update_credentials(
+            self._sec.get_sarvam_key()
         )
 
         logger.info("Settings applied to live components")
@@ -423,8 +472,9 @@ class DictateAnywhere:
         self._floating.set_state(state)
         self._preview.set_listening(state == "active")
         if state == "active":
-            self._floating.start_countdown(
-                float(self._cfg.get("max_record_seconds", 30)))
+            if self._cfg.get("enable_max_record_limit", True):
+                self._floating.start_countdown(
+                    float(self._cfg.get("max_record_seconds", 30)))
         else:
             self._floating.stop_countdown()
 
@@ -439,25 +489,23 @@ class DictateAnywhere:
         win.lift()
         win.grab_set()
 
-        from tkinter import ttk as _ttk
-
-        _ttk.Label(
+        ttk.Label(
             win,
             text=f"DictateAnywhere {latest} is available!",
             font=("Segoe UI", 12, "bold"),
         ).pack(pady=(20, 4))
-        _ttk.Label(
+        ttk.Label(
             win,
             text=f"You have v{_APP_VERSION}.",
             foreground="gray",
         ).pack()
-        _ttk.Label(
+        ttk.Label(
             win,
             text="Visit GitHub Releases to download the latest installer.",
             foreground="gray",
         ).pack(pady=(4, 16))
 
-        btns = _ttk.Frame(win)
+        btns = ttk.Frame(win)
         btns.pack(pady=(0, 20))
 
         def _download():
@@ -468,9 +516,9 @@ class DictateAnywhere:
             self._updater.skip_version(latest)
             win.destroy()
 
-        _ttk.Button(btns, text="Download",          command=_download).pack(side=tk.LEFT, padx=6)
-        _ttk.Button(btns, text="Skip this version", command=_skip   ).pack(side=tk.LEFT, padx=6)
-        _ttk.Button(btns, text="Remind me later",   command=win.destroy).pack(side=tk.LEFT, padx=6)
+        ttk.Button(btns, text="Download",          command=_download).pack(side=tk.LEFT, padx=6)
+        ttk.Button(btns, text="Skip this version", command=_skip   ).pack(side=tk.LEFT, padx=6)
+        ttk.Button(btns, text="Remind me later",   command=win.destroy).pack(side=tk.LEFT, padx=6)
 
     def _on_widget_moved(self, x: int, y: int) -> None:
         self._cfg.set("widget_x", x)

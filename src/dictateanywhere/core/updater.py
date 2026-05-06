@@ -57,6 +57,10 @@ class UpdateChecker:
         self._current = current_version
         self._thread: Optional[threading.Thread] = None
 
+    @property
+    def current_version(self) -> str:
+        return self._current
+
     # ── Public API ─────────────────────────────────────────────────────────────
 
     def start(self, on_update_available: Callable[[str, str], None]) -> None:

@@ -16,11 +16,11 @@ from typing import Optional
 import numpy as np
 
 from .engine import EngineStatus, STTEngine, TranscriptionResult
-from ..utils.config import _app_data_dir
+from ..utils.config import app_data_dir
 
 logger = logging.getLogger(__name__)
 
-MODELS_DIR = _app_data_dir() / "models"
+MODELS_DIR = app_data_dir() / "models"
 SUPPORTED_MODELS = ("tiny", "base", "small", "medium", "large-v2", "large-v3")
 
 
@@ -45,6 +45,16 @@ class LocalEngine(STTEngine):
         self._language = language
         self._model = None
         MODELS_DIR.mkdir(parents=True, exist_ok=True)
+
+    # ── Properties ─────────────────────────────────────────────────────────────
+
+    @property
+    def model_size(self) -> str:
+        return self._model_size
+
+    @property
+    def compute_type(self) -> str:
+        return self._compute_type
 
     # ── STTEngine interface ────────────────────────────────────────────────────
 
@@ -90,9 +100,13 @@ class LocalEngine(STTEngine):
             audio_array = _pcm_to_float32(audio_bytes)
 
             t0 = time.monotonic()
+            lang_code = language or self._language
+            if lang_code == "auto":
+                lang_code = None
+
             segments, info = self._model.transcribe(  # type: ignore[union-attr]
                 audio_array,
-                language=language or self._language or None,
+                language=lang_code,
                 beam_size=5,
                 best_of=5,
                 temperature=0.0,
@@ -106,7 +120,7 @@ class LocalEngine(STTEngine):
                     "min_silence_duration_ms": 200,
                 },
                 word_timestamps=False,
-                condition_on_previous_text=True,
+                condition_on_previous_text=False,
                 compression_ratio_threshold=2.4,
                 log_prob_threshold=-1.0,
                 no_speech_threshold=0.6,
@@ -155,6 +169,11 @@ class LocalEngine(STTEngine):
 
     def set_language(self, language: str) -> None:
         self._language = language
+
+    def set_compute_type(self, compute_type: str) -> None:
+        if compute_type != self._compute_type:
+            self._compute_type = compute_type
+            self.unload()
 
 
 def _pcm_to_float32(pcm_bytes: bytes) -> np.ndarray:

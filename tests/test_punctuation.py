@@ -1,9 +1,5 @@
 """Tests for spoken punctuation normalisation and auto-capitalisation."""
 
-import sys
-import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
-
 import pytest
 from dictateanywhere.core.punctuation import (
     normalise_punctuation,
@@ -15,19 +11,19 @@ from dictateanywhere.core.punctuation import (
 
 class TestNormalisePunctuation:
     def test_period(self):
-        assert normalise_punctuation("hello period") == "hello ."
+        assert normalise_punctuation("hello period") == "hello."
 
     def test_comma(self):
-        assert normalise_punctuation("one comma two") == "one , two"
+        assert normalise_punctuation("one comma two") == "one, two"
 
     def test_question_mark(self):
-        assert normalise_punctuation("how are you question mark") == "how are you ?"
+        assert normalise_punctuation("how are you question mark") == "how are you?"
 
     def test_exclamation(self):
-        assert normalise_punctuation("wow exclamation mark") == "wow !"
+        assert normalise_punctuation("wow exclamation mark") == "wow!"
 
     def test_new_line(self):
-        assert normalise_punctuation("line one new line line two") == "line one \n line two"
+        assert normalise_punctuation("line one new line line two") == "line one\n line two"
 
     def test_new_paragraph(self):
         result = normalise_punctuation("first paragraph new paragraph second")
@@ -38,8 +34,8 @@ class TestNormalisePunctuation:
         assert '"' in result
 
     def test_case_insensitive(self):
-        assert normalise_punctuation("Hello PERIOD") == "Hello ."
-        assert normalise_punctuation("Hello Period") == "Hello ."
+        assert normalise_punctuation("Hello PERIOD") == "Hello."
+        assert normalise_punctuation("Hello Period") == "Hello."
 
     def test_no_change_when_no_keywords(self):
         text = "the quick brown fox"
@@ -51,10 +47,10 @@ class TestNormalisePunctuation:
         assert "." in result
 
     def test_full_stop_alias(self):
-        assert normalise_punctuation("end full stop") == "end ."
+        assert normalise_punctuation("end full stop") == "end."
 
     def test_ellipsis(self):
-        assert normalise_punctuation("and so on ellipsis") == "and so on …"
+        assert normalise_punctuation("and so on ellipsis") == "and so on…"
 
     def test_delete_that(self):
         result = normalise_punctuation("wrong word delete that")

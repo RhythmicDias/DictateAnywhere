@@ -88,8 +88,8 @@ class CloudEngine(STTEngine):
             self._status = EngineStatus.BUSY
             t0 = time.monotonic()
 
-            # Wrap PCM in WAV container for the push stream
-            wav_bytes = _pcm_to_wav(audio_bytes)
+            # Push raw PCM directly — the AudioStreamFormat already describes
+            # the byte layout; wrapping in WAV would double-encode the header.
             lang = language or self._language
 
             speech_config = speechsdk.SpeechConfig(
@@ -115,8 +115,8 @@ class CloudEngine(STTEngine):
                 audio_config=audio_config,
             )
 
-            # Push all audio then signal EOF
-            push_stream.write(wav_bytes)
+            # Push raw PCM then signal EOF
+            push_stream.write(audio_bytes)
             push_stream.close()
 
             result = recogniser.recognize_once_async().get()

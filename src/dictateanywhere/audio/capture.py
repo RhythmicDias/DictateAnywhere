@@ -177,6 +177,7 @@ class AudioCapture:
 
         self._frame_queue: queue.Queue[bytes] = queue.Queue()
         self._all_frames: list[bytes] = []
+        self._frames_lock = threading.Lock()
         self._stream: Optional[sd.InputStream] = None
         self._recording = False
         self._working_device: Optional[int] = self._requested_device
@@ -296,11 +297,14 @@ class AudioCapture:
 
         while not self._frame_queue.empty():
             try:
-                self._all_frames.append(self._frame_queue.get_nowait())
+                frame = self._frame_queue.get_nowait()
+                with self._frames_lock:
+                    self._all_frames.append(frame)
             except queue.Empty:
                 break
 
-        audio_bytes = b"".join(self._all_frames)
+        with self._frames_lock:
+            audio_bytes = b"".join(self._all_frames)
         duration_s = len(audio_bytes) / (TARGET_RATE * 2)
         logger.info("Audio capture stopped — %.2f s at 16 kHz int16", duration_s)
         return audio_bytes
@@ -325,7 +329,8 @@ class AudioCapture:
 
         chunk = np.clip(mono_f32, -1.0, 1.0)
         chunk_int16 = (chunk * 32767.0).astype(np.int16).tobytes()
-        self._all_frames.append(chunk_int16)
+        with self._frames_lock:
+            self._all_frames.append(chunk_int16)
         self._frame_queue.put(chunk_int16)
 
         # Level meter — throttled to ~60 ms so the UI isn't flooded
@@ -384,6 +389,8 @@ class TimedCapture:
 
     def stop(self) -> None:
         self._stop_event.set()
+        if self._thread and self._thread.is_alive():
+            self._thread.join(timeout=2.0)
 
     def _run(self) -> None:
         last_speech_time = time.monotonic()

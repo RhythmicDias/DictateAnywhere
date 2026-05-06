@@ -17,24 +17,33 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 APP_NAME = "DictateAnywhere"
-CONFIG_VERSION = 1
+CONFIG_VERSION = 2
 
 
-def _app_data_dir() -> Path:
+def app_data_dir() -> Path:
+    """Return (and create) the per-user app data directory."""
     base = os.environ.get("APPDATA") or Path.home() / "AppData" / "Roaming"
     d = Path(base) / APP_NAME
     d.mkdir(parents=True, exist_ok=True)
     return d
 
 
-CONFIG_PATH = _app_data_dir() / "config.json"
-LOG_PATH = _app_data_dir() / "dictateanywhere.log"
+# Keep for backward compat — alias
+_app_data_dir = app_data_dir
+
+
+def _default_config_path() -> Path:
+    return app_data_dir() / "config.json"
+
+
+def _default_log_path() -> Path:
+    return app_data_dir() / "dictateanywhere.log"
 
 
 @dataclass
 class Config:
     # ── Version ──────────────────────────────────────────────────────────────
-    version: int = CONFIG_VERSION
+    version: int = CONFIG_VERSION  # bump when adding migrations
 
     # ── Engine ───────────────────────────────────────────────────────────────
     engine_mode: str = "hybrid"          # "local" | "cloud" | "hybrid"
@@ -42,13 +51,18 @@ class Config:
     language: str = "en"                 # BCP-47 language code
     compute_type: str = "int8"           # int8 | float16 | float32 (CPU efficiency)
     cloud_region: str = "eastus"         # Azure region
+    sarvam_model: str = "saarika:v2.5"   # Sarvam model (saarika:v2.5 | saaras:v3)
+    sarvam_language: str = "hi-IN"       # Default Indian language for Sarvam
+
 
     # ── Audio ─────────────────────────────────────────────────────────────────
     mic_device_index: int = -1           # -1 = system default
     sample_rate: int = 16000            # Hz — Whisper expects 16 kHz
-    vad_aggressiveness: int = 1          # 0–3 (0=permissive, 3=aggressive)
+    vad_aggressiveness: int = 1          # 0–3; default changed 2→1 in v1.1
     silence_timeout_ms: int = 2500       # ms of silence before stopping capture
     max_record_seconds: int = 30         # hard cap per utterance
+    enable_max_record_limit: bool = True  # whether to enforce the cap
+
 
     # ── Hotkey ───────────────────────────────────────────────────────────────
     hotkey: str = "ctrl+alt+d"           # configurable key combo
@@ -90,6 +104,16 @@ class Config:
     last_update_check: str = ""          # ISO date (YYYY-MM-DD) of last check
     skipped_update_version: str = ""    # release tag the user chose to skip
 
+    # ── Text Polish ───────────────────────────────────────────────────────────
+    enable_polish: bool = False
+    polish_provider: str = "ollama"
+    polish_action: str = "Fix Grammar & Spelling"
+    ollama_url: str = "http://localhost:11434"
+    polish_ollama_model: str = "llama3"
+    polish_cloud_provider: str = "google"
+    polish_cloud_model: str = "gemini-1.5-pro"
+    polish_api_key: str = ""
+
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
@@ -103,8 +127,8 @@ class Config:
 class ConfigManager:
     """Load, save, and validate application configuration."""
 
-    def __init__(self, path: Path = CONFIG_PATH) -> None:
-        self._path = path
+    def __init__(self, path: Path | None = None) -> None:
+        self._path = path or _default_config_path()
         self._config: Config = Config()
         self.load()
 
@@ -155,21 +179,26 @@ class ConfigManager:
 
     def _migrate(self) -> None:
         """
-        One-time upgrades when old default values are detected on disk.
-        Safe to run on every load — only writes when a migration is needed.
+        One-time upgrades guarded by config version.
+        Only runs when config.version < CONFIG_VERSION.
         """
         changed = False
 
         # v1.0 → v1.1: silence timeout increased 1500 → 2500 ms
-        if self._config.silence_timeout_ms == 1500:
+        if self._config.version < 2 and self._config.silence_timeout_ms == 1500:
             self._config.silence_timeout_ms = 2500
             logger.info("Config migrated: silence_timeout_ms 1500 → 2500")
             changed = True
 
         # v1.0 → v1.1: VAD aggressiveness reduced 2 → 1
-        if self._config.vad_aggressiveness == 2:
+        if self._config.version < 2 and self._config.vad_aggressiveness == 2:
             self._config.vad_aggressiveness = 1
             logger.info("Config migrated: vad_aggressiveness 2 → 1")
+            changed = True
+
+        # Stamp current version
+        if self._config.version < CONFIG_VERSION:
+            self._config.version = CONFIG_VERSION
             changed = True
 
         if changed:
@@ -185,4 +214,4 @@ class ConfigManager:
         return self._path.parent
 
     def log_path(self) -> Path:
-        return LOG_PATH
+        return _default_log_path()

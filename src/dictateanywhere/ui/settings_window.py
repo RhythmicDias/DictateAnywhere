@@ -103,7 +103,7 @@ class SettingsWindow:
         self._win = tk.Toplevel(self._root)
         self._win.title("DictateAnywhere — Settings")
         self._win.resizable(False, False)
-        self._win.grab_set()
+        # Non-modal — user can still interact with floating widget and preview
         self._win.protocol("WM_DELETE_WINDOW", self.close)
 
         nb = ttk.Notebook(self._win)
@@ -111,6 +111,7 @@ class SettingsWindow:
 
         self._vars: dict[str, tk.Variable] = {}
         self._azure_key_var = tk.StringVar()
+        self._sarvam_key_var = tk.StringVar()
         self._status_var = tk.StringVar(value="")
 
         self._build_tab_engine(nb)
@@ -118,8 +119,10 @@ class SettingsWindow:
         self._build_tab_hotkey(nb)
         self._build_tab_widget(nb)
         self._build_tab_cloud(nb)
+        self._build_tab_sarvam(nb)
         self._build_tab_advanced(nb)
         self._build_tab_corrections(nb)
+        self._build_tab_polish(nb)
 
         bar = ttk.Frame(self._win)
         bar.pack(fill=tk.X, padx=_PAD, pady=(0, _PAD))
@@ -137,7 +140,7 @@ class SettingsWindow:
     def _build_tab_engine(self, nb: ttk.Notebook) -> None:
         f = self._tab(nb, "Engine")
         self._combo(f, "Engine mode", "engine_mode",
-                    ["hybrid", "local", "cloud"],
+                    ["hybrid", "local", "cloud", "sarvam"],
                     "Hybrid uses local Whisper first; falls back to Azure if it fails.")
         self._combo(f, "Whisper model size", "model_size",
                     ["tiny", "base", "small", "medium", "large-v2", "large-v3"],
@@ -194,6 +197,7 @@ class SettingsWindow:
                     "0 = capture everything; 3 = filter aggressively (best for noisy rooms).")
         self._spin(f, "Silence timeout (ms)", "silence_timeout_ms", 300, 5000, 100,
                    "Dictation stops after this many ms of silence. 1500 ms recommended.")
+        self._check(f, "Enable maximum recording limit", "enable_max_record_limit")
         self._spin(f, "Max recording length (s)", "max_record_seconds", 5, 120, 5,
                    "Hard cap to prevent runaway recordings.")
 
@@ -268,6 +272,53 @@ class SettingsWindow:
                    command=self._test_azure).pack(anchor=tk.W, padx=_PAD, pady=_PAD)
         self._azure_test_label = ttk.Label(f, text="", foreground="gray")
         self._azure_test_label.pack(anchor=tk.W, padx=_PAD)
+        
+    def _build_tab_sarvam(self, nb: ttk.Notebook) -> None:
+        f = self._tab(nb, "Sarvam AI")
+        ttk.Label(f, text="Sarvam AI API Key", font=("", 9, "bold")).pack(
+            anchor=tk.W, padx=_PAD, pady=(_PAD, 2))
+        _hint(f, "Excellent for Indian languages (Hindi, Malayalam, etc.).\n"
+              "Get your key at https://www.sarvam.ai/")
+
+        existing_key = self._sec.get_sarvam_key() or ""
+        display = ("•" * 12 + existing_key[-4:]) if len(existing_key) > 4 else existing_key
+        self._sarvam_key_var.set(display)
+
+        key_frame = ttk.Frame(f)
+        key_frame.pack(fill=tk.X, padx=_PAD, pady=4)
+        self._sarvam_key_entry = ttk.Entry(key_frame, textvariable=self._sarvam_key_var,
+                                           width=48, show="•")
+        self._sarvam_key_entry.pack(side=tk.LEFT)
+        
+        ttk.Button(key_frame, text="Show",
+                   command=lambda: self._toggle_sarvam_key_visibility()).pack(side=tk.LEFT, padx=4)
+        ttk.Button(key_frame, text="Clear",
+                   command=self._clear_sarvam_key).pack(side=tk.LEFT)
+
+        self._combo(f, "Sarvam model", "sarvam_model",
+                    ["saarika:v2.5", "saaras:v3"],
+                    "saarika:v2.5 is the standard STT model.")
+        
+        self._combo(f, "Sarvam language", "sarvam_language",
+                    ["hi-IN", "bn-IN", "gu-IN", "kn-IN", "ml-IN", "mr-IN", "pa-IN", "ta-IN", "te-IN", "en-IN", "auto"],
+                    "Default language code for Sarvam STT.")
+
+    def _toggle_sarvam_key_visibility(self) -> None:
+        if self._sarvam_key_entry["show"] == "•":
+            self._sarvam_key_entry.configure(show="")
+            key = self._sec.get_sarvam_key() or ""
+            self._sarvam_key_var.set(key)
+        else:
+            self._sarvam_key_entry.configure(show="•")
+            key = self._sec.get_sarvam_key() or ""
+            display = ("•" * 12 + key[-4:]) if len(key) > 4 else key
+            self._sarvam_key_var.set(display)
+
+    def _clear_sarvam_key(self) -> None:
+        if messagebox.askyesno("Clear Sarvam Key", "Remove the Sarvam API key from this machine?", parent=self._win):
+            self._sec.delete_sarvam_key()
+            self._sarvam_key_var.set("")
+            self._status_var.set("Sarvam key cleared.")
 
     def _build_tab_advanced(self, nb: ttk.Notebook) -> None:
         f = self._tab(nb, "Advanced")
@@ -363,10 +414,15 @@ class SettingsWindow:
             canvas.configure(scrollregion=canvas.bbox("all"))
         self._corr_inner.bind("<Configure>", _update_scroll)
 
-        # Mouse-wheel scrolling
+        # Mouse-wheel scrolling — scoped to corrections canvas only
         def _on_wheel(event):
             canvas.yview_scroll(-1 * (event.delta // 120), "units")
-        canvas.bind_all("<MouseWheel>", _on_wheel)
+        def _bind_wheel(event):
+            canvas.bind_all("<MouseWheel>", _on_wheel)
+        def _unbind_wheel(event):
+            canvas.unbind_all("<MouseWheel>")
+        canvas.bind("<Enter>", _bind_wheel)
+        canvas.bind("<Leave>", _unbind_wheel)
 
         # Column headers
         hdr = ttk.Frame(self._corr_inner)
@@ -404,6 +460,112 @@ class SettingsWindow:
         ttk.Label(f, textvariable=self._corr_status_var,
                   foreground="gray").pack(anchor=tk.W, padx=_PAD)
 
+    def _build_tab_polish(self, nb: ttk.Notebook) -> None:
+        f = self._tab(nb, "Polish")
+        
+        ttk.Label(f, text="Text Polish Settings", font=("", 10, "bold")).pack(
+            anchor=tk.W, padx=_PAD, pady=(_PAD, 2))
+        
+        # We need a local helper for hint since _hint is defined at module level
+        # but wait, _hint is already imported/defined.
+        
+        ttk.Label(f, text="Send transcribed text to an AI model to clean up formatting or grammar.", 
+                  foreground="gray").pack(anchor=tk.W, padx=_PAD)
+        ttk.Label(f, text="Logic for this tab will be built in the future.", 
+                  foreground="gray").pack(anchor=tk.W, padx=_PAD, pady=(0, 4))
+        
+        self._check(f, "Enable Polish mode", "enable_polish")
+        
+        self._combo(f, "Polish Provider", "polish_provider",
+                    ["none", "ollama", "third_party"],
+                    "Select the AI provider to use.")
+                    
+        self._combo(f, "Polish Action", "polish_action",
+                    ["Fix Grammar & Spelling", "Make Professional", "Summarize", "Chat", "Custom Prompt"],
+                    "What should the AI do with the dictated text?")
+                    
+        ttk.Separator(f).pack(fill=tk.X, padx=_PAD, pady=_PAD)
+        ttk.Label(f, text="Ollama Settings (Local)", font=("", 9, "bold")).pack(anchor=tk.W, padx=_PAD)
+        
+        # Ollama URL
+        self._vars["ollama_url"] = tk.StringVar(value=str(self._cfg.get("ollama_url", "http://localhost:11434")))
+        url_frame = ttk.Frame(f)
+        url_frame.pack(fill=tk.X, padx=_PAD, pady=2)
+        ttk.Label(url_frame, text="Ollama URL:", width=_LABEL_W).pack(side=tk.LEFT)
+        ttk.Entry(url_frame, textvariable=self._vars["ollama_url"], width=30).pack(side=tk.LEFT)
+        ttk.Button(url_frame, text="Check Server", command=self._test_ollama_server).pack(side=tk.LEFT, padx=4)
+        
+        self._vars["polish_ollama_model"] = tk.StringVar(value=str(self._cfg.get("polish_ollama_model", "llama3")))
+        model_frame = ttk.Frame(f)
+        model_frame.pack(fill=tk.X, padx=_PAD, pady=2)
+        ttk.Label(model_frame, text="Ollama Model:", width=_LABEL_W).pack(side=tk.LEFT)
+        self._ollama_model_combo = ttk.Combobox(model_frame, textvariable=self._vars["polish_ollama_model"], 
+                                                values=["llama3", "mistral", "gemma", "phi3"], 
+                                                width=28)
+        self._ollama_model_combo.pack(side=tk.LEFT)
+        ttk.Button(model_frame, text="Refresh Models", command=self._refresh_ollama_models).pack(side=tk.LEFT, padx=4)
+                    
+        ttk.Separator(f).pack(fill=tk.X, padx=_PAD, pady=_PAD)
+        ttk.Label(f, text="Cloud Settings (Third-Party)", font=("", 9, "bold")).pack(anchor=tk.W, padx=_PAD)
+        self._combo(f, "Cloud Provider", "polish_cloud_provider",
+                    ["google", "openai", "anthropic"],
+                    "Select the third-party cloud provider.")
+        
+        self._combo(f, "Cloud Model", "polish_cloud_model",
+                    ["gemini-1.5-pro", "gemini-1.5-flash", "gpt-4o", "claude-3.5-sonnet"],
+                    "Select or type the model name for the cloud provider.")
+
+    def _test_ollama_server(self) -> None:
+        url = self._vars["ollama_url"].get().strip()
+        if not url:
+            messagebox.showwarning("Ollama Server", "Please enter an Ollama URL.", parent=self._win)
+            return
+            
+        self._status_var.set("Checking Ollama server...")
+        self._win.update_idletasks()
+        
+        def _check():
+            from ..core.polish import check_ollama_server
+            ok, msg = check_ollama_server(url)
+            self._root.after(0, lambda: self._on_ollama_tested(ok, msg))
+            
+        threading.Thread(target=_check, daemon=True).start()
+        
+    def _on_ollama_tested(self, ok: bool, msg: str) -> None:
+        if ok:
+            self._status_var.set(msg)
+            messagebox.showinfo("Ollama Server", msg, parent=self._win)
+        else:
+            self._status_var.set("Ollama connection failed.")
+            messagebox.showerror("Ollama Error", msg, parent=self._win)
+
+    def _refresh_ollama_models(self) -> None:
+        url = self._vars["ollama_url"].get().strip()
+        if not url:
+            return
+            
+        self._status_var.set("Fetching Ollama models...")
+        self._win.update_idletasks()
+        
+        def _fetch():
+            from ..core.polish import get_ollama_models
+            models = get_ollama_models(url)
+            self._root.after(0, lambda: self._on_ollama_models_fetched(models))
+            
+        threading.Thread(target=_fetch, daemon=True).start()
+        
+    def _on_ollama_models_fetched(self, models: list) -> None:
+        if not models:
+            self._status_var.set("No models found or connection failed.")
+            messagebox.showwarning("Ollama Models", "Could not fetch models. Is the server running?", parent=self._win)
+            return
+            
+        self._status_var.set(f"Found {len(models)} Ollama models.")
+        self._ollama_model_combo["values"] = models
+        current = self._vars["polish_ollama_model"].get()
+        if current not in models and models:
+            self._vars["polish_ollama_model"].set(models[0])
+            
     def _refresh_corrections(self) -> None:
         """Rebuild the list of correction rows from the manager."""
         for w in self._corr_rows_frame.winfo_children():
@@ -619,8 +781,17 @@ class SettingsWindow:
             if not ok:
                 messagebox.showwarning(
                     "Credential warning",
-                    "Failed to save the Azure API key to Windows Credential Manager.\n"
-                    "Check that the keyring service is available.",
+                    "Failed to save the Azure API key to Windows Credential Manager.",
+                    parent=self._win,
+                )
+        
+        raw_sarvam_key = self._sarvam_key_var.get().strip()
+        if raw_sarvam_key and not raw_sarvam_key.startswith("•"):
+            ok = self._sec.store_sarvam_key(raw_sarvam_key)
+            if not ok:
+                messagebox.showwarning(
+                    "Credential warning",
+                    "Failed to save the Sarvam API key to Windows Credential Manager.",
                     parent=self._win,
                 )
 
@@ -743,7 +914,7 @@ class SettingsWindow:
                     if messagebox.askyesno(
                         "Update Available",
                         f"DictateAnywhere {latest} is available.\n"
-                        f"You have {self._updater._current}.\n\n"
+                        f"You have {self._updater.current_version}.\n\n"
                         "Open the releases page to download?",
                         parent=self._win,
                     ):
@@ -751,7 +922,7 @@ class SettingsWindow:
                         webbrowser.open(url)
                 else:
                     self._update_result_var.set(
-                        f"You're up to date (v{self._updater._current}).")
+                        f"You're up to date (v{self._updater.current_version}).")
             self._root.after(0, _show)
 
         self._updater.check_now(_on_result)

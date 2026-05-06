@@ -12,9 +12,12 @@ from __future__ import annotations
 
 import logging
 import math
+import os
 import time
 import tkinter as tk
 from typing import Callable, Optional
+
+from PIL import Image, ImageTk
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +64,10 @@ class FloatingWidget:
         self._countdown_start: float = 0.0
         self._countdown_max:   float = 30.0
         self._counting_down:   bool  = False
+        
+        # Icon assets (loaded on demand/init)
+        self._icons: dict[str, ImageTk.PhotoImage] = {}
+        self._load_assets()
 
         # Transparent top-level window (no border, no title bar)
         self._win = tk.Toplevel(root)
@@ -230,17 +237,15 @@ class FloatingWidget:
                 fill=pulse_col, outline="", width=0,
             )
 
-        # ── Subtle drop shadow ───────────────────────────────────────────────
-        shadow_r = r - 1
-        c.create_oval(
-            cx - shadow_r + 2, cy - shadow_r + 3,
-            cx + shadow_r + 2, cy + shadow_r + 3,
-            fill="#000000", outline="", width=0,
-        )
-
         # ── Main circle ─────────────────────────────────────────────────────
-        c.create_oval(cx - r, cy - r, cx + r, cy + r,
-                      fill=bg, outline=ring, width=max(1, s // 32))
+        # Only draw the manual circle if the icon asset failed to load
+        if not self._icons.get(state):
+            c.create_oval(cx - r, cy - r, cx + r, cy + r,
+                          fill=bg, outline=ring, width=max(1, s // 32))
+
+        # ── Microphone icon ─────────────────────────────────────────────────
+        # Note: In premium mode, the icon IS the button background
+        self._draw_mic(c, cx, cy, state)
 
         # ── Countdown ring (active state while recording) ───────────────────
         if state == "active" and self._counting_down and self._countdown_max > 0:
@@ -295,70 +300,56 @@ class FloatingWidget:
                     anchor=tk.CENTER,
                 )
 
-        # ── Inner highlight arc (gives a glossy pill effect) ────────────────
-        hr = r * 0.72
-        c.create_arc(
-            cx - hr, cy - hr * 1.1,
-            cx + hr * 0.6, cy,
-            start=40, extent=120,
-            style=tk.ARC, outline=self._lighten(bg, 0.35),
-            width=max(1, s // 40),
-        )
+    def _load_assets(self) -> None:
+        """Load and resize icon PNGs from the assets folder."""
+        # Find assets folder relative to this file
+        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+        icons_dir = os.path.join(base_dir, "assets", "icons")
+        
+        icon_files = {
+            "idle":    "mic_idle.png",
+            "active":  "mic_active.png",
+            "loading": "mic_loading.png",
+            "error":   "mic_idle.png",
+        }
+        
+        target_size = int(self._size - 4)  # Fill the whole button minus a tiny border
+        
+        for state, filename in icon_files.items():
+            path = os.path.join(icons_dir, filename)
+            if os.path.exists(path):
+                try:
+                    import numpy as np
+                    img = Image.open(path).convert("RGBA")
+                    img = img.resize((target_size, target_size), Image.Resampling.LANCZOS)
 
-        # ── Microphone icon ─────────────────────────────────────────────────
-        self._draw_mic(c, cx, cy, s)
+                    # Tkinter's create_image ignores PNG alpha — transparent pixels
+                    # render as the canvas bg colour (#010101). We pre-composite and
+                    # then apply a hard alpha threshold so the anti-aliased fringe
+                    # (which would otherwise appear as a dark ring) is forced to
+                    # exactly #010101, which the window's transparentcolor hides.
+                    rgba  = np.array(img, dtype=np.float32)
+                    alpha = rgba[:, :, 3:4] / 255.0           # 0.0 – 1.0
+                    rgb   = rgba[:, :, :3]
+                    bg_np = np.array([1.0, 1.0, 1.0])         # #010101
+                    comp  = (alpha * rgb + (1.0 - alpha) * bg_np).astype(np.uint8)
+                    # Hard-clip: any pixel whose original alpha < 50% → #010101
+                    comp[alpha[:, :, 0] < 0.50] = [1, 1, 1]
+                    bg = Image.fromarray(comp, mode="RGB")
+                    self._icons[state] = ImageTk.PhotoImage(bg)
+                except Exception as exc:
+                    logger.error("Failed to load icon %s: %s", filename, exc)
+            else:
+                logger.warning("Icon not found: %s", path)
 
-    def _draw_mic(self, c: tk.Canvas, cx: float, cy: float, s: float) -> None:
-        """Modern, rounded microphone icon centred on (cx, cy)."""
-        col = _ICON_COLOUR
-
-        # Body: rounded rectangle (approximated with oval + rect)
-        bw = s * 0.22          # body width
-        bh = s * 0.32          # body height
-        bx = cx - bw / 2
-        by = cy - s * 0.22     # top of body
-
-        # Body fill
-        c.create_rectangle(
-            bx, by + bw / 2,
-            bx + bw, by + bh,
-            fill=col, outline="", width=0,
-        )
-        # Rounded top cap
-        c.create_oval(
-            bx, by,
-            bx + bw, by + bw,
-            fill=col, outline="", width=0,
-        )
-        # Rounded bottom cap
-        c.create_oval(
-            bx, by + bh - bw,
-            bx + bw, by + bh,
-            fill=col, outline="", width=0,
-        )
-
-        # Stand arc
-        arc_r  = s * 0.26
-        arc_cy = by + bh - bw / 2         # arc centre y = bottom of mic body
-        arc_w  = max(2, int(s * 0.055))
-        c.create_arc(
-            cx - arc_r, arc_cy - arc_r,
-            cx + arc_r, arc_cy + arc_r,
-            start=0, extent=-180,
-            style=tk.ARC, outline=col, width=arc_w,
-        )
-
-        # Vertical stem
-        stem_top = arc_cy
-        stem_bot = cy + s * 0.30
-        c.create_line(cx, stem_top, cx, stem_bot,
-                      fill=col, width=arc_w, capstyle=tk.ROUND)
-
-        # Base bar
-        base_hw = s * 0.16
-        c.create_line(cx - base_hw, stem_bot,
-                      cx + base_hw, stem_bot,
-                      fill=col, width=arc_w, capstyle=tk.ROUND)
+    def _draw_mic(self, c: tk.Canvas, cx: float, cy: float, state: str) -> None:
+        """Render the high-quality PNG icon for the current state."""
+        icon = self._icons.get(state) or self._icons.get("idle")
+        if icon:
+            c.create_image(cx, cy, image=icon, anchor=tk.CENTER)
+        else:
+            # Fallback to a very simple circle if loading failed
+            c.create_oval(cx-4, cy-4, cx+4, cy+4, fill="white", outline="")
 
     # ── Hover highlight ────────────────────────────────────────────────────────
 
@@ -392,9 +383,7 @@ class FloatingWidget:
                 self._on_position_changed(x, y)
 
     def _get_position(self) -> tuple[int, int]:
-        geo = self._win.geometry()
-        parts = geo.replace("-", "+-").split("+")
-        return int(parts[1]), int(parts[2])
+        return self._win.winfo_x(), self._win.winfo_y()
 
     # ── Colour utilities ──────────────────────────────────────────────────────
 

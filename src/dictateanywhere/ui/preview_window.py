@@ -6,16 +6,10 @@ utterances and a live "● Listening…" indicator while recording is active.
 
 Design goals
 ────────────
-- No title bar (overrideredirect) — stays out of Alt+Tab and taskbar.
-- Semi-transparent dark background so it reads over any app.
-- Draggable via the header bar.
-- Auto-hides after a configurable timeout; stays open while listening.
-- Never steals keyboard focus.
-
-Thread-safety
-─────────────
-All public methods MUST be called on the tkinter main thread.
-From worker threads, schedule via root.after(0, method).
+- Rounded corners for a premium feel.
+- Smooth waveform visualizer instead of LED segments.
+- Semi-transparent dark background.
+- Draggable and auto-hiding.
 """
 
 from __future__ import annotations
@@ -29,23 +23,23 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 # ── Appearance constants ───────────────────────────────────────────────────────
-_MAX_HISTORY  = 3
-_WIDTH        = 540
-_FONT_BODY    = ("Segoe UI", 11)
-_FONT_HINT    = ("Segoe UI", 9)
-_BG           = "#1e1e1e"
-_HEADER_BG    = "#2c2c2c"
-_FG_NEWEST    = "#ffffff"
-_FG_OLDER     = "#888888"
-_FG_EMPTY     = "#1e1e1e"   # invisible — same as bg
-_FG_LISTEN    = "#4fc3f7"   # ice blue
-_FG_HINT      = "#555555"
-_PAD_X        = 14
-_PAD_Y        = 8
+_MAX_HISTORY   = 3
+_WIDTH         = 560
+_RADIUS        = 28
+_FONT_BODY     = ("Segoe UI Semibold", 11)
+_FONT_HINT     = ("Segoe UI", 9)
+_BG            = "#1a1a1a"
+_ACCENT        = "#4fc3f7"   # ice blue
+_FG_NEWEST     = "#ffffff"
+_FG_OLDER      = "#888888"
+_FG_HINT       = "#666666"
+_PAD_X         = 20
+_PAD_Y         = 12
+_TRANS_COLOUR  = "#ff00ff"   # magic pink for transparency
 
 
 class PreviewWindow:
-    """Floating overlay that shows recent dictation output."""
+    """Floating overlay that shows recent dictation output with a modern aesthetic."""
 
     def __init__(self, root: tk.Tk, config_manager) -> None:
         self._root = root
@@ -57,17 +51,16 @@ class PreviewWindow:
         self._hide_id:  Optional[str] = None
         self._drag_x    = 0
         self._drag_y    = 0
-        self._level: float = 0.0          # latest RMS from microphone (0.0–1.0)
-        # widget refs (populated in _ensure_window)
+        self._level: float = 0.0
+        self._level_history: deque[float] = deque([0.0] * 40, maxlen=40)
+        
+        # widget refs
+        self._canvas:       Optional[tk.Canvas] = None
         self._status_lbl:   Optional[tk.Label]  = None
-        self._level_canvas: Optional[tk.Canvas] = None
         self._text_labels:  list[tk.Label]      = []
-        self._text_frame:   Optional[tk.Frame]  = None
-
-    # ── Public API (call on main thread) ──────────────────────────────────────
+        self._main_frame:   Optional[tk.Frame]  = None
 
     def show_text(self, text: str) -> None:
-        """Append a completed utterance and (re-)display the overlay."""
         if not text.strip():
             return
         self._history.append(text.strip())
@@ -78,27 +71,29 @@ class PreviewWindow:
         self._schedule_auto_hide()
 
     def set_listening(self, active: bool) -> None:
-        """Drive the Listening indicator without adding text."""
         self._listening = active
         if not active:
-            self._level = 0.0   # reset meter when recording stops
+            self._level = 0.0
+            self._level_history = deque([0.0] * 40, maxlen=40)
+        
         if not self._cfg.get("show_preview_window", True):
             return
+            
         if active:
             self._cancel_auto_hide()
+            self._history.clear()
             self._ensure_window()
         self._refresh()
         if not active:
             self._schedule_auto_hide()
 
     def set_level(self, rms: float) -> None:
-        """Update the live microphone level meter (called on the main thread)."""
         self._level = rms
-        if self._listening and self._level_canvas:
-            self._draw_level()
+        self._level_history.append(rms)
+        if self._listening and self._canvas:
+            self._draw_waveform()
 
     def toggle_visibility(self) -> None:
-        """Show if hidden, hide if visible."""
         if self._visible:
             self.hide()
         else:
@@ -117,8 +112,6 @@ class PreviewWindow:
         self._win = None
         self._visible = False
 
-    # ── Window construction ────────────────────────────────────────────────────
-
     def _ensure_window(self) -> None:
         if self._win and self._win.winfo_exists():
             if not self._visible:
@@ -129,159 +122,156 @@ class PreviewWindow:
         win = tk.Toplevel(self._root)
         win.overrideredirect(True)
         win.wm_attributes("-topmost", True)
-        win.wm_attributes("-alpha", 0.92)
-        win.configure(bg=_BG)
+        win.wm_attributes("-alpha", 0.85)
+        win.wm_attributes("-transparentcolor", _TRANS_COLOUR)
+        win.configure(bg=_TRANS_COLOUR)
         win.resizable(False, False)
-        win.lift()
-        # Prevent focus steal
-        win.wm_attributes("-disabled", False)
 
-        # ── Position: bottom-centre of primary screen ──────────────────────
+        # Main canvas for rounded background
+        self._canvas = tk.Canvas(
+            win, width=_WIDTH, height=120,
+            bg=_TRANS_COLOUR, highlightthickness=0
+        )
+        self._canvas.pack(fill=tk.BOTH, expand=True)
+
+        # Initial position
         sw = win.winfo_screenwidth()
         sh = win.winfo_screenheight()
-        x  = (sw - _WIDTH) // 2
-        y  = sh - 200
-        win.geometry(f"{_WIDTH}x80+{x}+{y}")
+        x = (sw - _WIDTH) // 2
+        y = sh - 220
+        win.geometry(f"{_WIDTH}x120+{x}+{y}")
 
-        # ── Header (drag handle · status · close) ─────────────────────────
-        header = tk.Frame(win, bg=_HEADER_BG, cursor="fleur")
-        header.pack(fill=tk.X)
+        # Bindings for drag
+        self._canvas.bind("<ButtonPress-1>", self._drag_start)
+        self._canvas.bind("<B1-Motion>",     self._drag_motion)
 
-        self._status_lbl = tk.Label(
-            header, text="", font=_FONT_HINT,
-            bg=_HEADER_BG, fg=_FG_LISTEN,
-            anchor=tk.W, padx=_PAD_X, pady=5,
-        )
-        self._status_lbl.pack(side=tk.LEFT, fill=tk.X, expand=True)
-
-        # ── Level meter (16-segment LED bar) ──────────────────────────────
-        _METER_SEGS  = 16
-        _SEG_W       = 4
-        _SEG_GAP     = 1
-        _METER_W     = _METER_SEGS * (_SEG_W + _SEG_GAP) - _SEG_GAP
-        _METER_H     = 10
-        self._level_canvas = tk.Canvas(
-            header,
-            width=_METER_W, height=_METER_H,
-            bg=_HEADER_BG, highlightthickness=0,
-        )
-        self._level_canvas.pack(side=tk.RIGHT, padx=(0, 8), pady=0, anchor=tk.CENTER)
-        self._draw_level()
-
-        close_btn = tk.Label(
-            header, text="✕", font=("Segoe UI", 9),
-            bg=_HEADER_BG, fg="#555555", cursor="hand2",
-            padx=12, pady=5,
-        )
-        close_btn.pack(side=tk.RIGHT)
-        close_btn.bind("<Button-1>",  lambda _e: self.hide())
-        close_btn.bind("<Enter>",     lambda _e: close_btn.configure(fg="#ffffff"))
-        close_btn.bind("<Leave>",     lambda _e: close_btn.configure(fg="#555555"))
-
-        # ── Text body ─────────────────────────────────────────────────────
-        self._text_frame = tk.Frame(win, bg=_BG)
-        self._text_frame.pack(fill=tk.BOTH, expand=True,
-                              padx=_PAD_X, pady=_PAD_Y)
-
-        self._text_labels = []
-        for _ in range(_MAX_HISTORY):
-            lbl = tk.Label(
-                self._text_frame, text="", font=_FONT_BODY,
-                bg=_BG, fg=_FG_OLDER, anchor=tk.W, justify=tk.LEFT,
-                wraplength=_WIDTH - _PAD_X * 2,
-            )
-            lbl.pack(fill=tk.X, pady=1)
-            self._text_labels.append(lbl)
-
-        # ── Drag bindings on header, status label, and level canvas ───────
-        for widget in (header, self._status_lbl, self._level_canvas):
-            widget.bind("<ButtonPress-1>", self._drag_start)
-            widget.bind("<B1-Motion>",     self._drag_motion)
-
-        self._win     = win
+        self._win = win
         self._visible = True
         self._refresh()
-
-    # ── Rendering ─────────────────────────────────────────────────────────────
 
     def _refresh(self) -> None:
         if not self._win or not self._win.winfo_exists():
             return
-        if not self._status_lbl:
-            return
 
-        # Header status text
+        # 1. Redraw the rounded container
+        c = self._canvas
+        c.delete("bg")
+        w, h = _WIDTH, self._win.winfo_height()
+        self._draw_rounded_rect(c, 0, 0, w, h, _RADIUS, fill=_BG, tags="bg")
+
+        # 2. Rebuild/Update internal widgets
+        if not self._main_frame:
+            # Solid background to prevent transparent holes, inset by 12px
+            # so the sharp corners stay safely inside the rounded Canvas polygon.
+            self._main_frame = tk.Frame(self._win, bg=_BG)
+            self._main_frame.place(x=12, y=12, width=_WIDTH-24, height=h-24)
+            
+            header = tk.Frame(self._main_frame, bg=_BG)
+            header.pack(fill=tk.X, padx=_PAD_X - 12, pady=(4, 5))
+            
+            self._status_lbl = tk.Label(
+                header, text="", font=_FONT_HINT,
+                bg=_BG, fg=_ACCENT, anchor=tk.W
+            )
+            self._status_lbl.pack(side=tk.LEFT)
+            
+            close_btn = tk.Label(
+                header, text="✕", font=_FONT_HINT,
+                bg=_BG, fg=_FG_HINT, cursor="hand2"
+            )
+            close_btn.pack(side=tk.RIGHT)
+            close_btn.bind("<Button-1>", lambda _: self.hide())
+
+            # Small canvas specifically for the waveform
+            self._wave_canvas = tk.Canvas(header, width=120, height=20, bg=_BG, highlightthickness=0)
+            self._wave_canvas.pack(side=tk.RIGHT, padx=10)
+            
+            self._text_labels = []
+            for _ in range(_MAX_HISTORY):
+                lbl = tk.Label(
+                    self._main_frame, text="", font=_FONT_BODY,
+                    bg=_BG, fg=_FG_OLDER, anchor=tk.W, justify=tk.LEFT,
+                    wraplength=_WIDTH - 24 - (_PAD_X * 2)
+                )
+                lbl.pack(fill=tk.X, padx=_PAD_X, pady=1)
+                self._text_labels.append(lbl)
+
+        # Header text
         if self._listening:
-            self._status_lbl.configure(text="●  Listening…", fg=_FG_LISTEN)
+            self._status_lbl.configure(text="●  Listening…", fg=_ACCENT)
         elif self._history:
-            self._status_lbl.configure(text="DictateAnywhere — last dictation",
-                                        fg=_FG_HINT)
+            self._status_lbl.configure(text="Last Dictation", fg=_FG_HINT)
         else:
-            self._status_lbl.configure(text="DictateAnywhere preview",
-                                        fg=_FG_HINT)
+            self._status_lbl.configure(text="Ready", fg=_FG_HINT)
 
-        # Level meter — show active colours while listening, dim otherwise
-        self._draw_level()
-
-        # Text rows — pad deque to _MAX_HISTORY with empty strings
-        history  = list(self._history)
-        padded   = [""] * (_MAX_HISTORY - len(history)) + history
-        last_idx = _MAX_HISTORY - 1
-
+        # Text labels
+        history = list(self._history)
+        padded = [""] * (_MAX_HISTORY - len(history)) + history
         for i, (lbl, text) in enumerate(zip(self._text_labels, padded)):
             if not text:
-                lbl.configure(text=" ", fg=_FG_EMPTY)
-            elif i == last_idx:
-                lbl.configure(text=text, fg=_FG_NEWEST)
+                lbl.pack_forget()
             else:
-                lbl.configure(text=text, fg=_FG_OLDER)
+                lbl.pack(fill=tk.X, padx=_PAD_X, pady=2)
+                lbl.configure(text=text, fg=_FG_NEWEST if i == _MAX_HISTORY-1 else _FG_OLDER)
 
-        # Auto-fit window height
+        # Dynamic height adjustment
         self._win.update_idletasks()
-        req_h = self._win.winfo_reqheight()
-        geo   = self._win.geometry()
+        # _main_frame reqheight + 24px (12px top/bottom inset) to fully enclose it
+        req_h = self._main_frame.winfo_reqheight() + 24
+        new_h = max(req_h, 80)
+        
+        geo = self._win.geometry()
         try:
             _, rest = geo.split("+", 1)
-            xp, yp  = rest.split("+")
-            self._win.geometry(f"{_WIDTH}x{max(req_h, 60)}+{xp}+{yp}")
-        except Exception:
+            xp, yp = rest.split("+")
+            if int(self._win.winfo_height()) != new_h:
+                self._win.geometry(f"{_WIDTH}x{new_h}+{xp}+{yp}")
+                self._win.update_idletasks()  # Force canvas to resize before we redraw
+                
+                # Place frame again to match new height, with 12px inset
+                self._main_frame.place(x=12, y=12, width=_WIDTH-24, height=new_h-24)
+                # Redraw background
+                c.delete("bg")
+                self._draw_rounded_rect(c, 0, 0, _WIDTH, new_h, _RADIUS, fill=_BG, tags="bg")
+        except:
             pass
+            
+        self._draw_waveform()
 
-    # ── Level meter drawing ────────────────────────────────────────────────────
-
-    def _draw_level(self) -> None:
-        """Redraw the 16-segment LED bar to reflect self._level (RMS float32)."""
-        c = self._level_canvas
-        if not c:
+    def _draw_waveform(self) -> None:
+        """Draw a smooth rolling wave on the canvas."""
+        if not hasattr(self, "_wave_canvas"): return
+        c = self._wave_canvas
+        if not c: return
+        c.delete("wave")
+        
+        if not self._listening:
             return
-        c.delete("all")
 
-        _SEGS   = 16
-        _SEG_W  = 4
-        _SEG_GAP = 1
-        _H      = 10
+        w = 120
+        mid_y = 10 # middle of the 20px high canvas
+        
+        points = []
+        hist = list(self._level_history)
+        n = len(hist)
+        dx = w / (n - 1)
+        start_x = 0
+        
+        for i, rms in enumerate(hist):
+            x = start_x + i * dx
+            # Log scale for wave height
+            amp = min(1.0, math.log10(1.0 + rms * 100) / 2.0) * 8
+            points.extend([x, mid_y - amp, x, mid_y + amp])
+            
+        if len(points) >= 4:
+            # Draw as a series of vertical lines (frequency bars but smooth)
+            for i in range(0, len(points), 4):
+                c.create_line(points[i], points[i+1], points[i+2], points[i+3],
+                             fill=_ACCENT, width=2, capstyle=tk.ROUND, tags="wave")
 
-        # Log scale: maps 0 → 0, 0.01 → ~0.35, 0.06 → ~0.85, 0.1+ → 1.0
-        fraction = min(1.0, math.log10(1.0 + self._level * 150.0) / math.log10(151.0))
-        lit_count = int(fraction * _SEGS)
-
-        for i in range(_SEGS):
-            x0 = i * (_SEG_W + _SEG_GAP)
-            x1 = x0 + _SEG_W
-            if not self._listening:
-                colour = "#333333"   # all dim when idle
-            elif i < lit_count:
-                if i < 10:
-                    colour = "#4CAF50"   # green  — normal speech
-                elif i < 13:
-                    colour = "#FFC107"   # amber  — moderate
-                else:
-                    colour = "#FF5252"   # red    — loud / clipping risk
-            else:
-                colour = "#2a2a2a"       # unlit segment
-            c.create_rectangle(x0, 0, x1, _H, fill=colour, outline="")
-
-    # ── Auto-hide timer ────────────────────────────────────────────────────────
+    def _draw_rounded_rect(self, canvas, x1, y1, x2, y2, r, **kwargs):
+        points = [x1+r, y1, x2-r, y1, x2, y1, x2, y1+r, x2, y2-r, x2, y2, x2-r, y2, x1+r, y2, x1, y2, x1, y2-r, x1, y1+r, x1, y1]
+        return canvas.create_polygon(points, **kwargs, smooth=True)
 
     def _schedule_auto_hide(self) -> None:
         self._cancel_auto_hide()
@@ -291,13 +281,9 @@ class PreviewWindow:
 
     def _cancel_auto_hide(self) -> None:
         if self._hide_id:
-            try:
-                self._root.after_cancel(self._hide_id)
-            except Exception:
-                pass
+            try: self._root.after_cancel(self._hide_id); 
+            except: pass
             self._hide_id = None
-
-    # ── Drag ──────────────────────────────────────────────────────────────────
 
     def _drag_start(self, event: tk.Event) -> None:
         self._drag_x = event.x_root - self._win.winfo_x()

@@ -1,41 +1,21 @@
 # Icons
 
-Place your icon files here. DictateAnywhere expects:
+The DictateAnywhere tray icon and floating widget icon are **generated
+programmatically at runtime** — no static `.ico` or `.png` files are required.
 
-| File       | Size     | Used for                          |
-|------------|----------|-----------------------------------|
-| `mic.ico`  | 256×256  | Windows taskbar / .exe icon       |
-| `mic.png`  | 256×256  | Fallback / About dialog           |
+| Component         | Generator                          |
+| ----------------- | ---------------------------------- |
+| System tray icon  | `ui/tray.py → _make_icon()`        |
+| Floating button   | `ui/floating_widget.py → _draw()`  |
 
-## Generating icons
+Both draw directly onto PIL/Pillow images and tk Canvas objects using
+colour-coded circles and microphone shapes.
 
-**Quick option — use a free online converter:**
-1. Create or download a microphone SVG (e.g. from [heroicons.com](https://heroicons.com))
-2. Convert to `.ico` at [icoconvert.com](https://icoconvert.com)
+## PyInstaller builds
 
-**From the command line (requires Pillow):**
-```bash
-pip install Pillow
-python - <<'EOF'
-from PIL import Image, ImageDraw
+The `--add-data "assets;assets"` flag in the build script bundles this
+directory into the `.exe` distribution. It is kept for future use (e.g.
+custom `.ico` for the window or installer).
 
-def make_mic_icon(path: str, size: int = 256):
-    img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(img)
-    c = "#4A90D9"
-    draw.ellipse([4, 4, size-4, size-4], fill=c)
-    # body
-    bw, bh = size*0.25, size*0.40
-    bx, by = (size-bw)/2, size*0.08
-    draw.rounded_rectangle([bx, by, bx+bw, by+bh], radius=size//10, fill="white")
-    img.save(path)
-
-make_mic_icon("mic.png")
-img = Image.open("mic.png")
-img.save("mic.ico", format="ICO", sizes=[(256,256),(128,128),(64,64),(32,32),(16,16)])
-print("Icons generated.")
-EOF
-```
-
-The application generates tray icons programmatically at runtime using Pillow,
-so the `.ico` file is only required for the packaged `.exe` build.
+To add a custom window icon in the future, place `app.ico` here and
+reference it in the PyInstaller spec with `--icon=assets/icons/app.ico`.

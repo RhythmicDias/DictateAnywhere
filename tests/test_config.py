@@ -1,12 +1,8 @@
 """Tests for ConfigManager."""
 
-import sys
-import os
 import json
 import tempfile
 from pathlib import Path
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 import pytest
 from dictateanywhere.utils.config import Config, ConfigManager
@@ -26,7 +22,7 @@ class TestConfig:
         assert c.model_size == "small"
         assert c.hotkey == "ctrl+alt+d"
         assert c.language == "en"
-        assert c.vad_aggressiveness == 2
+        assert c.vad_aggressiveness == 1
 
     def test_to_dict_round_trip(self):
         c = Config()

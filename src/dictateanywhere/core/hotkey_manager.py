@@ -62,18 +62,18 @@ class HotkeyManager:
                 keyboard.on_press_key(
                     self._hotkey.split("+")[-1],
                     self._on_push_down,
-                    suppress=False,
+                    suppress=True,
                 )
                 keyboard.on_release_key(
                     self._hotkey.split("+")[-1],
                     self._on_push_up,
-                    suppress=False,
+                    suppress=True,
                 )
             else:
                 keyboard.add_hotkey(
                     self._hotkey,
                     self._on_toggle,
-                    suppress=False,
+                    suppress=True,
                 )
             self._registered = True
             logger.info("Hotkey registered: %r (mode=%s)", self._hotkey, self._mode)
@@ -87,11 +87,12 @@ class HotkeyManager:
         if not self._registered:
             return
         try:
-            keyboard.remove_hotkey(self._hotkey)
-        except Exception:
-            pass
-        try:
-            keyboard.unhook_all()
+            if self._mode == "push_to_talk":
+                # Remove only the specific key hooks we set
+                trigger_key = self._hotkey.split("+")[-1]
+                keyboard.unhook_key(trigger_key)
+            else:
+                keyboard.remove_hotkey(self._hotkey)
         except Exception:
             pass
         self._registered = False
@@ -146,6 +147,11 @@ class HotkeyManager:
                     threading.Thread(target=self._on_stop, daemon=True).start()
 
     def _on_push_down(self, event) -> None:
+        # Verify all modifier keys are currently pressed
+        parts = self._hotkey.lower().split("+")
+        modifiers = parts[:-1]  # everything except the trigger key
+        if modifiers and not all(keyboard.is_pressed(m) for m in modifiers):
+            return
         with self._lock:
             if not self._active:
                 self._active = True
@@ -154,6 +160,11 @@ class HotkeyManager:
                     threading.Thread(target=self._on_start, daemon=True).start()
 
     def _on_push_up(self, event) -> None:
+        # Verify the full combo was in effect
+        parts = self._hotkey.lower().split("+")
+        modifiers = parts[:-1]
+        if modifiers and not all(keyboard.is_pressed(m) for m in modifiers):
+            return
         with self._lock:
             if self._active:
                 self._active = False

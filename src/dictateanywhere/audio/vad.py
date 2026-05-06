@@ -39,7 +39,6 @@ class VADFilter:
         self._vad = webrtcvad.Vad(aggressiveness)
         self._sample_rate = sample_rate
         self._pad = speech_pad_frames
-        self._ring: list[bool] = []
         self._pad_countdown = 0
 
     def is_speech(self, frame: bytes) -> bool:
@@ -68,7 +67,6 @@ class VADFilter:
         return False
 
     def reset(self) -> None:
-        self._ring.clear()
         self._pad_countdown = 0
 
 

@@ -24,6 +24,7 @@ Powered by [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (offline,
 | **Session history** | Searchable log of every dictated utterance — copy, export, or clear |
 | **Auto-update checker** | Silently checks GitHub Releases at startup; notifies when a new version is available |
 | **VAD filtering** | WebRTC Voice Activity Detection — CPU only active while you speak |
+| **LLM Text Polishing** | Integrated with local Ollama to automatically fix grammar, rewrite, or act as a conversational assistant |
 | **Secure key storage** | Azure API key stored in Windows Credential Manager (DPAPI) |
 | **Model selector** | tiny / base / **small** (recommended) / medium / large |
 | **Multi-language** | 20+ languages via Whisper; English is default |

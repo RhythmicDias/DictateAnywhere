@@ -15,12 +15,59 @@ Windows-only (uses pywin32 and ctypes).
 
 from __future__ import annotations
 
+import ctypes
+from ctypes import wintypes
 import logging
 import threading
 import time
 from typing import Optional
 
 logger = logging.getLogger(__name__)
+
+# ── Windows API Structures ──────────────────────────────────────────────────
+
+class KeyBdInput(ctypes.Structure):
+    _fields_ = [
+        ("wVk", wintypes.WORD),
+        ("wScan", wintypes.WORD),
+        ("dwFlags", wintypes.DWORD),
+        ("time", wintypes.DWORD),
+        ("dwExtraInfo", ctypes.c_void_p),
+    ]
+
+class HardwareInput(ctypes.Structure):
+    _fields_ = [
+        ("uMsg", wintypes.DWORD),
+        ("wParamL", wintypes.WORD),
+        ("wParamH", wintypes.WORD),
+    ]
+
+class MouseInput(ctypes.Structure):
+    _fields_ = [
+        ("dx", wintypes.LONG),
+        ("dy", wintypes.LONG),
+        ("mouseData", wintypes.DWORD),
+        ("dwFlags", wintypes.DWORD),
+        ("time", wintypes.DWORD),
+        ("dwExtraInfo", ctypes.c_void_p),
+    ]
+
+class Input_I(ctypes.Union):
+    _fields_ = [
+        ("ki", KeyBdInput), ("mi", MouseInput), ("hi", HardwareInput)
+    ]
+
+class Input(ctypes.Structure):
+    _fields_ = [("type", ctypes.c_ulong), ("ii", Input_I)]
+
+
+# Windows Constants
+VK_CONTROL = 0x11
+VK_V = 0x56
+KEYEVENTF_KEYUP = 0x0002
+KEYEVENTF_UNICODE = 0x0004
+INPUT_KEYBOARD = 1
+
 
 
 class TextInjector:
@@ -34,6 +81,21 @@ class TextInjector:
         self._method = method
         self._delay = delay_ms / 1000.0
         self._lock = threading.Lock()
+
+    # ── Clipboard retry helper ──────────────────────────────────────────────
+
+    @staticmethod
+    def _open_clipboard_retry(max_attempts: int = 3, delay: float = 0.05) -> bool:
+        """Try to open the clipboard with retries for apps that hold the lock."""
+        import win32clipboard
+        for attempt in range(max_attempts):
+            try:
+                win32clipboard.OpenClipboard()
+                return True
+            except Exception:
+                if attempt < max_attempts - 1:
+                    time.sleep(delay)
+        return False
 
     def inject(self, text: str) -> bool:
         """
@@ -61,9 +123,9 @@ class TextInjector:
             # Save current clipboard
             old_content: Optional[str] = None
             try:
-                win32clipboard.OpenClipboard()
-                if win32clipboard.IsClipboardFormatAvailable(win32con.CF_UNICODETEXT):
-                    old_content = win32clipboard.GetClipboardData(win32con.CF_UNICODETEXT)
+                if self._open_clipboard_retry():
+                    if win32clipboard.IsClipboardFormatAvailable(win32con.CF_UNICODETEXT):
+                        old_content = win32clipboard.GetClipboardData(win32con.CF_UNICODETEXT)
             except Exception:
                 pass
             finally:
@@ -73,37 +135,56 @@ class TextInjector:
                     pass
 
             # Set new clipboard content
-            win32clipboard.OpenClipboard()
+            if not self._open_clipboard_retry():
+                logger.error("Failed to open clipboard after retries")
+                return False
             win32clipboard.EmptyClipboard()
             win32clipboard.SetClipboardData(win32con.CF_UNICODETEXT, text)
             win32clipboard.CloseClipboard()
 
+            logger.info("Injecting %d chars via CLIPBOARD", len(text))
+
             # Small delay so the target app registers the clipboard change
             time.sleep(self._delay)
 
-            # Send Ctrl+V
-            import ctypes
-            VK_CONTROL = 0x11
-            VK_V = 0x56
-            KEYEVENTF_KEYUP = 0x0002
+            # Send Ctrl+V using SendInput
+            def _send_v():
+                # Ctrl down
+                ki_ctrl_down = KeyBdInput(VK_CONTROL, 0, 0, 0, 0)
+                event_ctrl_down = (Input * 1)(Input(INPUT_KEYBOARD, Input_I(ki=ki_ctrl_down)))
+                ctypes.windll.user32.SendInput(1, event_ctrl_down, ctypes.sizeof(Input))
+                time.sleep(0.005)
 
-            ctypes.windll.user32.keybd_event(VK_CONTROL, 0, 0, 0)
-            ctypes.windll.user32.keybd_event(VK_V, 0, 0, 0)
-            time.sleep(0.05)
-            ctypes.windll.user32.keybd_event(VK_V, 0, KEYEVENTF_KEYUP, 0)
-            ctypes.windll.user32.keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0)
+                # V down
+                ki_v_down = KeyBdInput(VK_V, 0, 0, 0, 0)
+                event_v_down = (Input * 1)(Input(INPUT_KEYBOARD, Input_I(ki=ki_v_down)))
+                ctypes.windll.user32.SendInput(1, event_v_down, ctypes.sizeof(Input))
+                time.sleep(0.005)
 
-            # Restore original clipboard after a brief delay
+                # V up
+                ki_v_up = KeyBdInput(VK_V, 0, KEYEVENTF_KEYUP, 0, 0)
+                event_v_up = (Input * 1)(Input(INPUT_KEYBOARD, Input_I(ki=ki_v_up)))
+                ctypes.windll.user32.SendInput(1, event_v_up, ctypes.sizeof(Input))
+                time.sleep(0.005)
+
+                # Ctrl up
+                ki_ctrl_up = KeyBdInput(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0, 0)
+                event_ctrl_up = (Input * 1)(Input(INPUT_KEYBOARD, Input_I(ki=ki_ctrl_up)))
+                ctypes.windll.user32.SendInput(1, event_ctrl_up, ctypes.sizeof(Input))
+
+            _send_v()
+
+            # Restore original clipboard after a safer delay
             def _restore():
-                time.sleep(0.3)
+                time.sleep(1.0)
                 try:
-                    win32clipboard.OpenClipboard()
-                    win32clipboard.EmptyClipboard()
-                    if old_content is not None:
-                        win32clipboard.SetClipboardData(
-                            win32con.CF_UNICODETEXT, old_content
-                        )
-                    win32clipboard.CloseClipboard()
+                    if TextInjector._open_clipboard_retry():
+                        win32clipboard.EmptyClipboard()
+                        if old_content is not None:
+                            win32clipboard.SetClipboardData(
+                                win32con.CF_UNICODETEXT, old_content
+                            )
+                        win32clipboard.CloseClipboard()
                 except Exception:
                     pass
 
@@ -123,71 +204,30 @@ class TextInjector:
         Works in apps that intercept or block clipboard paste.
         """
         try:
-            import ctypes
-            from ctypes import wintypes
-
-            PUL = ctypes.POINTER(ctypes.c_ulong)
-
-            class KeyBdInput(ctypes.Structure):
-                _fields_ = [
-                    ("wVk", ctypes.c_ushort),
-                    ("wScan", ctypes.c_ushort),
-                    ("dwFlags", ctypes.c_ulong),
-                    ("time", ctypes.c_ulong),
-                    ("dwExtraInfo", PUL),
-                ]
-
-            class HardwareInput(ctypes.Structure):
-                _fields_ = [
-                    ("uMsg", ctypes.c_ulong),
-                    ("wParamL", ctypes.c_short),
-                    ("wParamH", ctypes.c_ushort),
-                ]
-
-            class MouseInput(ctypes.Structure):
-                _fields_ = [
-                    ("dx", ctypes.c_long), ("dy", ctypes.c_long),
-                    ("mouseData", ctypes.c_ulong),
-                    ("dwFlags", ctypes.c_ulong),
-                    ("time", ctypes.c_ulong),
-                    ("dwExtraInfo", PUL),
-                ]
-
-            class Input_I(ctypes.Union):
-                _fields_ = [
-                    ("ki", KeyBdInput), ("mi", MouseInput), ("hi", HardwareInput)
-                ]
-
-            class Input(ctypes.Structure):
-                _fields_ = [("type", ctypes.c_ulong), ("ii", Input_I)]
-
-            KEYEVENTF_UNICODE = 0x0004
-            KEYEVENTF_KEYUP = 0x0002
-            INPUT_KEYBOARD = 1
-
-            extra = ctypes.c_ulong(0)
-            ii_ = Input_I()
-
-            inputs = []
             for char in text:
                 code = ord(char)
+                
                 # key down
-                ki_down = KeyBdInput(0, code, KEYEVENTF_UNICODE, 0, ctypes.pointer(extra))
+                ki_down = KeyBdInput(0, code, KEYEVENTF_UNICODE, 0, 0)
                 ii_down = Input_I()
                 ii_down.ki = ki_down
-                inputs.append(Input(INPUT_KEYBOARD, ii_down))
+                event_down = (Input * 1)(Input(INPUT_KEYBOARD, ii_down))
+                ctypes.windll.user32.SendInput(1, event_down, ctypes.sizeof(Input))
+                
+                # Tiny sleep to ensure KeyDown is processed before KeyUp
+                time.sleep(0.002)
+                
                 # key up
-                ki_up = KeyBdInput(0, code, KEYEVENTF_UNICODE | KEYEVENTF_KEYUP, 0,
-                                   ctypes.pointer(extra))
+                ki_up = KeyBdInput(0, code, KEYEVENTF_UNICODE | KEYEVENTF_KEYUP, 0, 0)
                 ii_up = Input_I()
                 ii_up.ki = ki_up
-                inputs.append(Input(INPUT_KEYBOARD, ii_up))
+                event_up = (Input * 1)(Input(INPUT_KEYBOARD, ii_up))
+                ctypes.windll.user32.SendInput(1, event_up, ctypes.sizeof(Input))
+                
+                # Tiny sleep to avoid flooding the target app's message loop
+                time.sleep(0.002)
 
-            InputArray = Input * len(inputs)
-            ctypes.windll.user32.SendInput(
-                len(inputs), InputArray(*inputs), ctypes.sizeof(Input)
-            )
-            logger.debug("Injected %d chars via SendInput", len(text))
+            logger.info("Injected %d chars via SENDINPUT", len(text))
             return True
 
         except Exception as exc:

@@ -90,7 +90,12 @@ def normalise_punctuation(text: str) -> str:
     def _replace(match: re.Match) -> str:
         return _lookup.get(match.group(0).lower(), match.group(0))
 
-    return _pattern.sub(_replace, text)
+    text = _pattern.sub(_replace, text)
+    # Collapse the space before punctuation:  " ." → "."
+    text = re.sub(r'\s+([.?!,;:\'"\)\]\}…—])', r'\1', text)
+    # Remove trailing space before newlines
+    text = re.sub(r' +(\n)', r'\1', text)
+    return text
 
 
 def auto_capitalise(text: str, previous_text: str = "") -> str:
@@ -132,13 +137,19 @@ def clean_whisper_artifacts(text: str) -> str:
     """
     Remove known Whisper hallucination patterns.
 
-    Only strip patterns that are *never* valid speech output:
+    Strips:
       - Bracketed/parenthesised noise tags like [Music] or (inaudible)
       - A lone period (common silence hallucination)
-
-    Do NOT strip real words or phrases like "you" or "thank you" — those are
-    valid transcriptions that the user actually said.
+      - Common hallucination phrases on silence ("Thank you.", "You.", etc.)
     """
+    # Known Whisper hallucination phrases on silence / near-silence
+    _HALLUCINATION_PHRASES = frozenset({
+        "thank you.", "thank you", "thanks for watching.",
+        "thanks for watching", "you.", "you",
+        "bye.", "bye", "the end.", "the end",
+        "d episode.", "d episode",
+    })
+
     patterns = [
         r"\[.*?\]",          # [Music], [Applause], [BLANK_AUDIO] …
         r"\(.*?\)",          # (inaudible), (background noise) …
@@ -146,4 +157,10 @@ def clean_whisper_artifacts(text: str) -> str:
     ]
     for pat in patterns:
         text = re.sub(pat, "", text, flags=re.IGNORECASE)
-    return text.strip()
+    text = text.strip()
+
+    # Reject entire output if it matches a known hallucination phrase
+    if text.lower() in _HALLUCINATION_PHRASES:
+        return ""
+
+    return text

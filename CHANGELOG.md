@@ -11,6 +11,20 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [1.3.0] - 2026-05-06
+
+### Added
+
+#### LLM Text Polishing (`core/polish.py`)
+- Automatically polish transcribed text using an LLM before injection
+- Local Ollama integration (`llama3`, `mistral`, `gemma`, `phi3`, etc.)
+- Third-party cloud integration stubs (`gemini`, `gpt-4o`, `claude-3.5-sonnet`)
+- Configurable actions: "Fix Grammar & Spelling", "Make Professional", "Summarize", "Chat", "Custom Prompt"
+- "Chat" action enables conversational mode where the LLM responds directly to your dictated prompt
+- Settings → Polish tab: Full UI to enable/disable, test server connection, and dynamically fetch/refresh installed Ollama models
+
+---
+
 ## [1.2.0] - 2026-05-03
 
 ### Added

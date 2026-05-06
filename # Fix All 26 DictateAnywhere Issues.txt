@@ -1,0 +1,471 @@
+# Fix All 26 DictateAnywhere Issues
+
+Fix every issue catalogued in [ISSUES.md](file:///d:/PythonProjects/DictateAnywhere/ISSUES.md), grouped by file/component to minimise context switching. No feature additions — strictly bug fixes and code hygiene.
+
+## User Review Required
+
+> [!IMPORTANT]
+> **I-01 (failing test):** The test asserts `clean_whisper_artifacts("Thank you.") == ""` but the function's own docstring says *"Do NOT strip real words."* I propose **adding a short hallucination-phrase list** (`"Thank you."`, `"Thanks for watching."`, `"You."`) rather than deleting the test, since Whisper genuinely hallucinates these on silence. Please confirm this approach.
+
+> [!IMPORTANT]
+> **I-14 (punctuation spacing):** The fix adds a post-processing regex that collapses ` .` → `.`, ` ,` → `,` etc. This will change existing transcription output — spaces before punctuation will no longer appear. Confirm this is desired.
+
+> [!WARNING]
+> **I-06 (Azure double-encoding):** Changing from WAV→raw PCM in the push stream is a functional fix for Azure users. If you don't currently use Azure cloud, this is low-risk. If you do, it should be tested with a real key.
+
+## Open Questions
+
+> [!IMPORTANT]
+> **I-16 (modal settings):** Removing `grab_set()` makes settings non-modal. Users could start dictation while settings are open. Is that acceptable, or should I keep modality and just allow the floating widget to stay interactive?
+
+---
+
+## Proposed Changes
+
+Changes are grouped by component. Dependencies flow top-down: utility fixes first, then core, then UI, then tests.
+
+---
+
+### Component 1 — `utils/config.py` (I-02, I-09)
+
+#### [MODIFY] [config.py](file:///d:/PythonProjects/DictateAnywhere/src/dictateanywhere/utils/config.py)
+
+**I-02 — Version-gated migration:**
+- Add `CONFIG_VERSION = 2` (bump from 1)
+- Guard the silence/VAD migration with `if self._config.version < 2`
+- Set `self._config.version = 2` after migration
+- Users who deliberately chose `vad_aggressiveness=2` or `silence_timeout_ms=1500` will no longer be overwritten
+
+```diff
+-CONFIG_VERSION = 1
++CONFIG_VERSION = 2
+
+ def _migrate(self) -> None:
+     changed = False
+-    if self._config.silence_timeout_ms == 1500:
++    if self._config.version < 2 and self._config.silence_timeout_ms == 1500:
+         self._config.silence_timeout_ms = 2500
+         changed = True
+-    if self._config.vad_aggressiveness == 2:
++    if self._config.version < 2 and self._config.vad_aggressiveness == 2:
+         self._config.vad_aggressiveness = 1
+         changed = True
++    if self._config.version < CONFIG_VERSION:
++        self._config.version = CONFIG_VERSION
++        changed = True
+     if changed:
+         self.save()
+```
+
+**I-09 — Lazy `CONFIG_PATH` / `LOG_PATH`:**
+- Remove module-level `CONFIG_PATH = _app_data_dir() / ...` assignments
+- Replace with `@staticmethod` methods on `ConfigManager` or lazy module-level functions
+- Rename `_app_data_dir()` → `app_data_dir()` (public) — also fixes **I-10**
+
+```diff
+-CONFIG_PATH = _app_data_dir() / "config.json"
+-LOG_PATH = _app_data_dir() / "dictateanywhere.log"
++def _default_config_path() -> Path:
++    return app_data_dir() / "config.json"
++
++def _default_log_path() -> Path:
++    return app_data_dir() / "dictateanywhere.log"
+```
+
+- Update `ConfigManager.__init__` default: `path: Path = None` → resolves lazily
+
+---
+
+### Component 2 — `transcription/local_engine.py` (I-08, I-10)
+
+#### [MODIFY] [local_engine.py](file:///d:/PythonProjects/DictateAnywhere/src/dictateanywhere/transcription/local_engine.py)
+
+**I-10 — Use public `app_data_dir()`:**
+```diff
+-from ..utils.config import _app_data_dir
+-MODELS_DIR = _app_data_dir() / "models"
++from ..utils.config import app_data_dir
++MODELS_DIR = app_data_dir() / "models"
+```
+
+**I-08 — Expose `model_size` and `compute_type` as properties:**
+```python
+@property
+def model_size(self) -> str:
+    return self._model_size
+
+@property
+def compute_type(self) -> str:
+    return self._compute_type
+```
+
+---
+
+### Component 3 — `main.py` (I-08, I-25)
+
+#### [MODIFY] [main.py](file:///d:/PythonProjects/DictateAnywhere/src/dictateanywhere/main.py)
+
+**I-08 — Use public properties instead of private attrs:**
+```diff
+-if (cfg.model_size != self._local_engine._model_size or
+-        cfg.compute_type != self._local_engine._compute_type):
++if (cfg.model_size != self._local_engine.model_size or
++        cfg.compute_type != self._local_engine.compute_type):
+     self._local_engine.set_model_size(cfg.model_size)
+-    self._local_engine._compute_type = cfg.compute_type
++    self._local_engine.set_compute_type(cfg.compute_type)
+```
+
+**I-25 — Move inline `ttk` import to top-level:**
+```diff
+ from tkinter import ttk
+ ...
+ def _show_update_dialog(self, latest: str, url: str) -> None:
+-    from tkinter import ttk as _ttk
+-    _ttk.Label(...)
++    ttk.Label(...)
+```
+
+---
+
+### Component 4 — `audio/capture.py` (I-11, I-12)
+
+#### [MODIFY] [capture.py](file:///d:/PythonProjects/DictateAnywhere/src/dictateanywhere/audio/capture.py)
+
+**I-11 — Thread-safe `_all_frames`:**
+- Add `self._frames_lock = threading.Lock()` in `__init__`
+- Guard `self._all_frames.append(...)` in `_callback()` with the lock
+- Guard `self._all_frames` reads in `stop()` with the lock
+
+```diff
++self._frames_lock = threading.Lock()
+ ...
+ def _callback(self, ...):
+     ...
+-    self._all_frames.append(chunk_int16)
++    with self._frames_lock:
++        self._all_frames.append(chunk_int16)
+```
+
+**I-12 — Join worker thread in `TimedCapture.stop()`:**
+```diff
+ def stop(self) -> None:
+     self._stop_event.set()
++    if self._thread and self._thread.is_alive():
++        self._thread.join(timeout=2.0)
+```
+
+---
+
+### Component 5 — `audio/vad.py` (I-13)
+
+#### [MODIFY] [vad.py](file:///d:/PythonProjects/DictateAnywhere/src/dictateanywhere/audio/vad.py)
+
+**I-13 — Remove dead `_ring` field:**
+```diff
+-    self._ring: list[bool] = []
+     self._pad_countdown = 0
+
+ def reset(self) -> None:
+-    self._ring.clear()
+     self._pad_countdown = 0
+```
+
+---
+
+### Component 6 — `core/punctuation.py` (I-01, I-14)
+
+#### [MODIFY] [punctuation.py](file:///d:/PythonProjects/DictateAnywhere/src/dictateanywhere/core/punctuation.py)
+
+**I-14 — Post-processing to collapse spaces before punctuation:**
+Add at the end of `normalise_punctuation()`:
+```python
+# Collapse the space before punctuation symbols:  " ." → "."
+text = re.sub(r'\s+([.?!,;:"\'\)\]\}…—])', r'\1', text)
+# Remove trailing space before newlines
+text = re.sub(r' +(\n)', r'\1', text)
+```
+
+**I-01 — Add common Whisper hallucination phrases to `clean_whisper_artifacts()`:**
+```python
+# Known Whisper hallucination phrases on silence/near-silence
+_HALLUCINATION_PHRASES = frozenset({
+    "thank you.", "thank you", "thanks for watching.",
+    "thanks for watching", "you.", "you",
+    "bye.", "bye", "the end.",
+})
+...
+stripped = text.strip()
+if stripped.lower() in _HALLUCINATION_PHRASES:
+    return ""
+```
+
+---
+
+### Component 7 — `core/hotkey_manager.py` (I-04, I-05)
+
+#### [MODIFY] [hotkey_manager.py](file:///d:/PythonProjects/DictateAnywhere/src/dictateanywhere/core/hotkey_manager.py)
+
+**I-04 — Remove `unhook_all()`, use targeted unhook:**
+```diff
+ def unregister(self) -> None:
+     if not self._registered:
+         return
+     try:
+-        keyboard.remove_hotkey(self._hotkey)
+-    except Exception:
+-        pass
+-    try:
+-        keyboard.unhook_all()
++        if self._mode == "push_to_talk":
++            keyboard.unhook_all_hotkeys()
++        else:
++            keyboard.remove_hotkey(self._hotkey)
+     except Exception:
+         pass
+     self._registered = False
+```
+
+**I-05 — Check modifiers in push-to-talk callbacks:**
+```python
+def _on_push_down(self, event) -> None:
+    # Verify all modifier keys are currently pressed
+    parts = self._hotkey.lower().split("+")
+    modifiers = parts[:-1]  # everything except the trigger key
+    if not all(keyboard.is_pressed(m) for m in modifiers):
+        return
+    with self._lock:
+        if not self._active:
+            self._active = True
+            ...
+```
+
+---
+
+### Component 8 — `core/text_injector.py` (I-15)
+
+#### [MODIFY] [text_injector.py](file:///d:/PythonProjects/DictateAnywhere/src/dictateanywhere/core/text_injector.py)
+
+**I-15 — Clipboard retry loop:**
+```python
+def _open_clipboard_with_retry(self, max_attempts: int = 3, delay: float = 0.05) -> bool:
+    """Try to open the clipboard with retries for apps that hold the lock."""
+    import win32clipboard
+    for attempt in range(max_attempts):
+        try:
+            win32clipboard.OpenClipboard()
+            return True
+        except Exception:
+            if attempt < max_attempts - 1:
+                time.sleep(delay)
+    return False
+```
+Replace both `win32clipboard.OpenClipboard()` calls with `self._open_clipboard_with_retry()`.
+
+---
+
+### Component 9 — `core/updater.py` (I-26)
+
+#### [MODIFY] [updater.py](file:///d:/PythonProjects/DictateAnywhere/src/dictateanywhere/core/updater.py)
+
+**I-26 — Expose `current_version` as a property:**
+```python
+@property
+def current_version(self) -> str:
+    return self._current
+```
+
+---
+
+### Component 10 — `transcription/cloud_engine.py` (I-06)
+
+#### [MODIFY] [cloud_engine.py](file:///d:/PythonProjects/DictateAnywhere/src/dictateanywhere/transcription/cloud_engine.py)
+
+**I-06 — Push raw PCM instead of WAV:**
+```diff
+-    wav_bytes = _pcm_to_wav(audio_bytes)
+     ...
+-    push_stream.write(wav_bytes)
++    push_stream.write(audio_bytes)
+```
+Keep `_pcm_to_wav()` for potential future use but remove its call in `transcribe()`.
+
+---
+
+### Component 11 — `ui/floating_widget.py` (I-17)
+
+#### [MODIFY] [floating_widget.py](file:///d:/PythonProjects/DictateAnywhere/src/dictateanywhere/ui/floating_widget.py)
+
+**I-17 — Use `winfo_x()`/`winfo_y()` instead of geometry parsing:**
+```diff
+ def _get_position(self) -> tuple[int, int]:
+-    geo = self._win.geometry()
+-    parts = geo.replace("-", "+-").split("+")
+-    return int(parts[1]), int(parts[2])
++    return self._win.winfo_x(), self._win.winfo_y()
+```
+
+---
+
+### Component 12 — `ui/settings_window.py` (I-07, I-16, I-26)
+
+#### [MODIFY] [settings_window.py](file:///d:/PythonProjects/DictateAnywhere/src/dictateanywhere/ui/settings_window.py)
+
+**I-07 — Scoped mousewheel binding:**
+```diff
+-canvas.bind_all("<MouseWheel>", _on_wheel)
++def _bind_wheel(event):
++    canvas.bind_all("<MouseWheel>", _on_wheel)
++def _unbind_wheel(event):
++    canvas.unbind_all("<MouseWheel>")
++canvas.bind("<Enter>", _bind_wheel)
++canvas.bind("<Leave>", _unbind_wheel)
+```
+
+**I-16 — Remove `grab_set()` for non-modal:**
+```diff
+-self._win.grab_set()
++# Non-modal — user can still interact with floating widget and preview
+```
+
+**I-26 — Use `current_version` property:**
+```diff
+-f"You have {self._updater._current}.\n\n"
++f"You have {self._updater.current_version}.\n\n"
+...
+-f"You're up to date (v{self._updater._current})."
++f"You're up to date (v{self._updater.current_version})."
+```
+
+---
+
+### Component 13 — `__main__.py` (I-18)
+
+#### [MODIFY] [__main__.py](file:///d:/PythonProjects/DictateAnywhere/src/dictateanywhere/__main__.py)
+
+**I-18 — Use relative import:**
+```diff
+-from dictateanywhere.main import main
++from .main import main
+```
+
+---
+
+### Component 14 — Tests (I-03, I-20)
+
+#### [MODIFY] [test_config.py](file:///d:/PythonProjects/DictateAnywhere/tests/test_config.py)
+
+**I-03 — Fix `vad_aggressiveness` assertion:**
+```diff
+-assert c.vad_aggressiveness == 2
++assert c.vad_aggressiveness == 1
+```
+
+**I-20 — Remove `sys.path` hack, add conftest.py:**
+
+#### [NEW] [conftest.py](file:///d:/PythonProjects/DictateAnywhere/tests/conftest.py)
+```python
+"""pytest configuration — ensures src/ is on sys.path for test discovery."""
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+```
+
+Remove `sys.path.insert(...)` lines from `test_config.py` and `test_punctuation.py`.
+
+#### [MODIFY] [test_punctuation.py](file:///d:/PythonProjects/DictateAnywhere/tests/test_punctuation.py)
+
+- Remove `sys.path.insert(...)` lines (moved to conftest)
+- Update `test_removes_lone_thank_you` to align with the new hallucination guard (already passes once I-01 is fixed)
+
+---
+
+### Component 15 — Project files (I-19, I-21, I-22, I-23, I-24)
+
+#### [MODIFY] [requirements.txt](file:///d:/PythonProjects/DictateAnywhere/requirements.txt)
+
+**I-19 — Add header noting pyproject.toml is canonical:**
+```diff
++# NOTE: This file mirrors the [project.dependencies] in pyproject.toml.
++# Keep them in sync. This file exists for pip install -r convenience.
+```
+
+#### [MODIFY] [release.yml](file:///d:/PythonProjects/DictateAnywhere/.github/workflows/release.yml)
+
+**I-21 — Add Python 3.13 to CI matrix:**
+```diff
+-python-version: ["3.11", "3.12"]
++python-version: ["3.11", "3.12", "3.13"]
+```
+
+**I-22 — Fix `webrtcvad` → `webrtcvad-wheels`:**
+```diff
+-pip install sounddevice numpy webrtcvad keyring pyperclip
++pip install sounddevice numpy webrtcvad-wheels keyring pyperclip
+```
+
+#### [MODIFY] [assets/icons/README.md](file:///d:/PythonProjects/DictateAnywhere/assets/icons/README.md)
+
+**I-23 — Note about generated icons:**
+Add a note that the tray icon is generated programmatically by `tray.py:_make_icon()` and `floating_widget.py`. No `.ico` file is required at runtime. Add a placeholder `.ico` for the PyInstaller build:
+- Generate a 64×64 PNG and convert to `.ico` using Pillow in a one-off script, or embed a minimal `.ico` directly.
+
+**I-24 — Callback type hints:** Applied inline across all modified files above — use `Callable[[], None]` where applicable.
+
+---
+
+## Verification Plan
+
+### Automated Tests
+
+```bat
+REM 1. Run existing tests — all must pass, especially the fixed ones
+scripts\test.bat
+
+REM 2. Run with verbose to see individual test results
+.venv\Scripts\python -m pytest tests/ -v --tb=short
+
+REM 3. Lint check
+.venv\Scripts\python -m ruff check src\
+```
+
+### Manual Verification
+
+| Issue | How to verify |
+|---|---|
+| I-01 | Run `test_removes_lone_thank_you` — passes |
+| I-02 | Set `vad_aggressiveness=2` in config.json, restart — value preserved |
+| I-03 | `test_defaults` passes |
+| I-04 | Register a hotkey, unregister, verify other keyboard hooks still work |
+| I-05 | Set push-to-talk to `ctrl+alt+d`, press just `d` — dictation should NOT start |
+| I-06 | (Azure users only) Test cloud transcription with a real key |
+| I-07 | Open Settings → Corrections, scroll — only corrections canvas scrolls |
+| I-14 | Dictate "hello period" — output should be `Hello.` not `Hello .` |
+| I-15 | Run while clipboard manager is active — no crash on paste |
+| I-16 | Open Settings, verify floating widget and preview still interactive |
+| I-17 | Drag floating widget to negative coordinates (left monitor) — no crash |
+| I-18 | Run `python -m dictateanywhere` from project root — starts correctly |
+
+### Execution Order
+
+```mermaid
+graph TD
+    A["1. utils/config.py<br/>(I-02, I-09, I-10)"] --> B["2. transcription/local_engine.py<br/>(I-08, I-10)"]
+    A --> C["3. main.py<br/>(I-08, I-25)"]
+    D["4. audio/capture.py<br/>(I-11, I-12)"] --> E["5. audio/vad.py<br/>(I-13)"]
+    F["6. core/punctuation.py<br/>(I-01, I-14)"]
+    G["7. core/hotkey_manager.py<br/>(I-04, I-05)"]
+    H["8. core/text_injector.py<br/>(I-15)"]
+    I["9. core/updater.py<br/>(I-26)"] --> J["10. transcription/cloud_engine.py<br/>(I-06)"]
+    K["11. ui/floating_widget.py<br/>(I-17)"]
+    L["12. ui/settings_window.py<br/>(I-07, I-16, I-26)"]
+    M["13. __main__.py<br/>(I-18)"]
+    N["14. Tests<br/>(I-03, I-20)"]
+    O["15. Project files<br/>(I-19, I-21, I-22, I-23, I-24)"]
+    A --> L
+    I --> L
+    B --> C
+    F --> N
+```
+
+Estimated effort: **~90 minutes** of code changes across 15 files.

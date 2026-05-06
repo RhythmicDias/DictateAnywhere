@@ -19,6 +19,7 @@ _SERVICE = "DictateAnywhere"
 
 # Credential identifiers
 AZURE_SPEECH_KEY = "azure_speech_api_key"
+SARVAM_API_KEY = "sarvam_api_key"
 
 
 class SecureStorage:
@@ -79,6 +80,20 @@ class SecureStorage:
 
     def has_azure_key(self) -> bool:
         return self.exists(AZURE_SPEECH_KEY)
+
+    # ── Named helpers — Sarvam ────────────────────────────────────────────────
+
+    def store_sarvam_key(self, api_key: str) -> bool:
+        return self.store(SARVAM_API_KEY, api_key)
+
+    def get_sarvam_key(self) -> Optional[str]:
+        return self.retrieve(SARVAM_API_KEY)
+
+    def delete_sarvam_key(self) -> bool:
+        return self.delete(SARVAM_API_KEY)
+
+    def has_sarvam_key(self) -> bool:
+        return self.exists(SARVAM_API_KEY)
 
     # ── Diagnostics ───────────────────────────────────────────────────────────
 

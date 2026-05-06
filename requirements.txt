@@ -1,3 +1,6 @@
+# NOTE: This file mirrors [project.dependencies] in pyproject.toml.
+# Keep them in sync. This file exists for `pip install -r` convenience.
+#
 # ─── Audio capture ────────────────────────────────────────────────────────────
 sounddevice>=0.5.1
 # numpy 2.x is required for Python 3.13+; pip picks the right version automatically
@@ -27,3 +30,6 @@ keyboard>=0.13.5
 # pywin32 311+ adds Python 3.13 support
 pywin32>=311
 pyperclip>=1.9.0
+
+# ─── Cloud STT (Sarvam AI) ────────────────────────────────────────────────────
+requests>=2.32.3
