@@ -12,7 +12,7 @@ Powered by [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (offline,
 |---|---|
 | **Hybrid STT** | Offline faster-whisper + Azure Speech cloud fallback |
 | **Always available** | System tray icon — lives quietly in your taskbar |
-| **Floating mic button** | Draggable, always-on-top, semi-transparent toggle |
+| **Floating mic button** | Draggable, always-on-top, semi-transparent toggle with modern, crisp icons for all states |
 | **Countdown ring** | Sweep arc on the mic button shows remaining recording time (green → amber → red) |
 | **Global hotkey** | Configurable (default `Ctrl+Alt+D`), toggle or push-to-talk |
 | **Types anywhere** | Injects text at your cursor in any Windows app |
@@ -78,7 +78,7 @@ DictateAnywhere starts silently and appears in the system tray (bottom-right of 
 
 While recording, a dark floating bar appears at the bottom of your screen showing:
 
-- **● Listening…** status with a **live mic level meter** (16 green/amber/red segments)
+- **● Listening…** status with a **smooth live waveform visualizer** to show your microphone activity
 - The last three dictated lines (newest is white; older lines dim)
 
 The overlay auto-hides a few seconds after dictation ends. You can drag it anywhere and close it with ✕. The hide delay is configurable in Settings → Advanced.

@@ -23,6 +23,12 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - "Chat" action enables conversational mode where the LLM responds directly to your dictated prompt
 - Settings → Polish tab: Full UI to enable/disable, test server connection, and dynamically fetch/refresh installed Ollama models
 
+### Changed
+
+#### UI Refinements
+- Redesigned the floating mic icons to a modern, crisp aesthetic, removing harsh black borders and corners
+- Upgraded the preview window microphone level meter from a 16-segment LED bar to a smooth live waveform visualizer
+
 ---
 
 ## [1.2.0] - 2026-05-03
