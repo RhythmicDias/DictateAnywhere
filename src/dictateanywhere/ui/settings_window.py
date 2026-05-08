@@ -112,14 +112,14 @@ class SettingsWindow:
         self._vars: dict[str, tk.Variable] = {}
         self._azure_key_var = tk.StringVar()
         self._sarvam_key_var = tk.StringVar()
+        self._gemini_key_var = tk.StringVar()
         self._status_var = tk.StringVar(value="")
 
         self._build_tab_engine(nb)
         self._build_tab_audio(nb)
         self._build_tab_hotkey(nb)
         self._build_tab_widget(nb)
-        self._build_tab_cloud(nb)
-        self._build_tab_sarvam(nb)
+        self._build_tab_cloud_stt(nb)
         self._build_tab_advanced(nb)
         self._build_tab_corrections(nb)
         self._build_tab_polish(nb)
@@ -140,7 +140,7 @@ class SettingsWindow:
     def _build_tab_engine(self, nb: ttk.Notebook) -> None:
         f = self._tab(nb, "Engine")
         self._combo(f, "Engine mode", "engine_mode",
-                    ["hybrid", "local", "cloud", "sarvam"],
+                    ["hybrid", "local", "azure", "gemini", "sarvam"],
                     "Hybrid uses local Whisper first; falls back to Azure if it fails.")
         self._combo(f, "Whisper model size", "model_size",
                     ["tiny", "base", "small", "medium", "large-v2", "large-v3"],
@@ -148,11 +148,17 @@ class SettingsWindow:
         self._combo(f, "Compute type", "compute_type",
                     ["int8", "float16", "float32"],
                     "int8 = fastest on CPU. float16 requires a compatible GPU.")
+        self._combo(f, "Local device", "local_device",
+                    ["auto", "cpu", "cuda"],
+                    "auto = detect best device. Select 'cuda' to force NVIDIA GPU.")
         self._combo(f, "Language", "language",
                     ["en", "es", "fr", "de", "it", "pt", "nl", "pl",
                      "ru", "zh", "ja", "ko", "ar", "hi", "auto"],
                     "auto = Whisper detects language automatically.")
         self._check(f, "Fall back to cloud on local error", "cloud_fallback_on_error")
+        self._combo(f, "Preferred fallback provider", "cloud_fallback_provider",
+                    ["azure", "gemini", "sarvam"],
+                    "Which cloud service to use when local Whisper fails.")
         self._check(f, "Fall back to local on cloud error", "local_fallback_on_cloud_error")
 
     def _build_tab_audio(self, nb: ttk.Notebook) -> None:
@@ -241,88 +247,117 @@ class SettingsWindow:
                    "How long (milliseconds) the overlay stays visible after the last\n"
                    "utterance. Set to 0 to keep it open until manually closed.")
 
-    def _build_tab_cloud(self, nb: ttk.Notebook) -> None:
-        f = self._tab(nb, "Azure Cloud")
-        ttk.Label(f, text="Azure Speech API Key", font=("", 9, "bold")).pack(
-            anchor=tk.W, padx=_PAD, pady=(_PAD, 2))
-        _hint(f, "Stored securely in Windows Credential Manager (DPAPI encrypted).\n"
-              "Never written to disk in plain text.\n"
-              "Free tier: 5 hours/month — https://azure.microsoft.com/free/")
-
-        existing_key = self._sec.get_azure_key() or ""
-        display = ("•" * 12 + existing_key[-4:]) if len(existing_key) > 4 else existing_key
-        self._azure_key_var.set(display)
-
-        key_frame = ttk.Frame(f)
-        key_frame.pack(fill=tk.X, padx=_PAD, pady=4)
-        self._key_entry = ttk.Entry(key_frame, textvariable=self._azure_key_var,
-                                    width=48, show="•")
-        self._key_entry.pack(side=tk.LEFT)
-        ttk.Button(key_frame, text="Show",
-                   command=self._toggle_key_visibility).pack(side=tk.LEFT, padx=4)
-        ttk.Button(key_frame, text="Clear",
-                   command=self._clear_azure_key).pack(side=tk.LEFT)
-
-        self._combo(f, "Azure region", "cloud_region",
-                    ["eastus", "westus", "westus2", "westeurope", "northeurope",
-                     "southeastasia", "australiaeast", "canadacentral",
-                     "uksouth", "japaneast", "centralindia", "brazilsouth"],
-                    "Must match the region of your Azure Speech resource.")
-        ttk.Button(f, text="Test Azure Connection",
-                   command=self._test_azure).pack(anchor=tk.W, padx=_PAD, pady=_PAD)
-        self._azure_test_label = ttk.Label(f, text="", foreground="gray")
-        self._azure_test_label.pack(anchor=tk.W, padx=_PAD)
+    def _build_tab_cloud_stt(self, nb: ttk.Notebook) -> None:
+        """Consolidated tab for all Cloud STT and AI Providers (Azure, Sarvam, Gemini)."""
+        f = self._tab(nb, "Cloud STT")
         
-    def _build_tab_sarvam(self, nb: ttk.Notebook) -> None:
-        f = self._tab(nb, "Sarvam AI")
-        ttk.Label(f, text="Sarvam AI API Key", font=("", 9, "bold")).pack(
-            anchor=tk.W, padx=_PAD, pady=(_PAD, 2))
-        _hint(f, "Excellent for Indian languages (Hindi, Malayalam, etc.).\n"
-              "Get your key at https://www.sarvam.ai/")
-
-        existing_key = self._sec.get_sarvam_key() or ""
-        display = ("•" * 12 + existing_key[-4:]) if len(existing_key) > 4 else existing_key
-        self._sarvam_key_var.set(display)
-
-        key_frame = ttk.Frame(f)
-        key_frame.pack(fill=tk.X, padx=_PAD, pady=4)
-        self._sarvam_key_entry = ttk.Entry(key_frame, textvariable=self._sarvam_key_var,
-                                           width=48, show="•")
-        self._sarvam_key_entry.pack(side=tk.LEFT)
+        # ── Azure Speech ──────────────────────────────────────────────────────
+        az_frame = ttk.LabelFrame(f, text=" Azure Speech ", padding=_PAD)
+        az_frame.pack(fill=tk.X, padx=_PAD, pady=4)
         
-        ttk.Button(key_frame, text="Show",
-                   command=lambda: self._toggle_sarvam_key_visibility()).pack(side=tk.LEFT, padx=4)
-        ttk.Button(key_frame, text="Clear",
-                   command=self._clear_sarvam_key).pack(side=tk.LEFT)
+        existing_az = self._sec.get_azure_key() or ""
+        display_az = ("•" * 12 + existing_az[-4:]) if len(existing_az) > 4 else existing_az
+        self._azure_key_var.set(display_az)
+        
+        az_key_row = ttk.Frame(az_frame)
+        az_key_row.pack(fill=tk.X, pady=2)
+        ttk.Label(az_key_row, text="API Key:", width=12).pack(side=tk.LEFT)
+        self._az_entry = ttk.Entry(az_key_row, textvariable=self._azure_key_var, show="•", width=40)
+        self._az_entry.pack(side=tk.LEFT, padx=4)
+        ttk.Button(az_key_row, text="👁", width=3, 
+                   command=self._toggle_key_visibility).pack(side=tk.LEFT)
+        
+        self._combo(az_frame, "Region", "cloud_region",
+                    ["eastus", "westus", "westeurope", "centralindia", "southeastasia"],
+                    "Must match your Azure resource region.")
+        
+        ttk.Button(az_frame, text="Test Azure Connection", 
+                   command=self._test_azure).pack(anchor=tk.W, pady=4)
+        self._azure_test_label = ttk.Label(az_frame, text="", foreground="gray")
+        self._azure_test_label.pack(anchor=tk.W)
 
-        self._combo(f, "Sarvam model", "sarvam_model",
+        # ── Sarvam AI ─────────────────────────────────────────────────────────
+        sa_frame = ttk.LabelFrame(f, text=" Sarvam AI ", padding=_PAD)
+        sa_frame.pack(fill=tk.X, padx=_PAD, pady=4)
+        
+        existing_sa = self._sec.get_sarvam_key() or ""
+        display_sa = ("•" * 12 + existing_sa[-4:]) if len(existing_sa) > 4 else existing_sa
+        self._sarvam_key_var.set(display_sa)
+        
+        sa_key_row = ttk.Frame(sa_frame)
+        sa_key_row.pack(fill=tk.X, pady=2)
+        ttk.Label(sa_key_row, text="API Key:", width=12).pack(side=tk.LEFT)
+        self._sa_entry = ttk.Entry(sa_key_row, textvariable=self._sarvam_key_var, show="•", width=40)
+        self._sa_entry.pack(side=tk.LEFT, padx=4)
+        ttk.Button(sa_key_row, text="👁", width=3, 
+                   command=self._toggle_sarvam_key_visibility).pack(side=tk.LEFT)
+        
+        self._combo(sa_frame, "Model", "sarvam_model",
                     ["saarika:v2.5", "saaras:v3"],
                     "saarika:v2.5 is the standard STT model.")
-        
-        self._combo(f, "Sarvam language", "sarvam_language",
+
+        self._combo(sa_frame, "Language", "sarvam_language",
                     ["hi-IN", "bn-IN", "gu-IN", "kn-IN", "ml-IN", "mr-IN", "pa-IN", "ta-IN", "te-IN", "en-IN", "auto"],
-                    "Default language code for Sarvam STT.")
+                    "Optimized for Indian languages.")
+        
+        self._check(sa_frame, "Enable WebSocket Streaming", "enable_sarvam_websocket")
+        _hint(sa_frame, "WebSocket provides lower latency for real-time previews.")
+        ttk.Label(sa_frame, text="⚠️ Note: Sarvam has a 30s limit per dictation.", 
+                  foreground="#d35400", font=("", 8, "bold")).pack(anchor=tk.W, padx=_PAD)
+        
+        ttk.Button(sa_frame, text="Test Sarvam Connection", 
+                   command=self._test_sarvam).pack(anchor=tk.W, pady=4)
+        self._sarvam_test_label = ttk.Label(sa_frame, text="", foreground="gray")
+        self._sarvam_test_label.pack(anchor=tk.W)
 
-    def _toggle_sarvam_key_visibility(self) -> None:
-        if self._sarvam_key_entry["show"] == "•":
-            self._sarvam_key_entry.configure(show="")
-            key = self._sec.get_sarvam_key() or ""
-            self._sarvam_key_var.set(key)
-        else:
-            self._sarvam_key_entry.configure(show="•")
-            key = self._sec.get_sarvam_key() or ""
-            display = ("•" * 12 + key[-4:]) if len(key) > 4 else key
-            self._sarvam_key_var.set(display)
+        # ── Google Gemini ─────────────────────────────────────────────────────
+        gm_frame = ttk.LabelFrame(f, text=" Google Gemini ", padding=_PAD)
+        gm_frame.pack(fill=tk.X, padx=_PAD, pady=4)
+        
+        existing_gm = self._sec.get_gemini_key() or ""
+        display_gm = ("•" * 12 + existing_gm[-4:]) if len(existing_gm) > 4 else existing_gm
+        self._gemini_key_var.set(display_gm)
+        
+        gm_key_row = ttk.Frame(gm_frame)
+        gm_key_row.pack(fill=tk.X, pady=2)
+        ttk.Label(gm_key_row, text="API Key:", width=12).pack(side=tk.LEFT)
+        self._gm_entry = ttk.Entry(gm_key_row, textvariable=self._gemini_key_var, show="•", width=40)
+        self._gm_entry.pack(side=tk.LEFT, padx=4)
+        ttk.Button(gm_key_row, text="👁", width=3, 
+                   command=self._toggle_gemini_key_visibility).pack(side=tk.LEFT)
+        
+        self._combo(gm_frame, "Model", "gemini_stt_model",
+                    ["gemini-flash-lite-latest", "gemini-2.0-flash-lite"],
+                    "Gemini 2.5 Flash Lite (latest) or Gemini 2 Flash Lite.")
 
-    def _clear_sarvam_key(self) -> None:
-        if messagebox.askyesno("Clear Sarvam Key", "Remove the Sarvam API key from this machine?", parent=self._win):
-            self._sec.delete_sarvam_key()
-            self._sarvam_key_var.set("")
-            self._status_var.set("Sarvam key cleared.")
+        self._combo(gm_frame, "Language", "gemini_stt_language",
+                    ["en", "hi", "es", "fr", "de", "it", "ja", "ko", "zh", "auto"],
+                    "Language of the dictated audio.")
+        
+        ttk.Button(gm_frame, text="Test Gemini Connection", 
+                   command=self._test_gemini).pack(anchor=tk.W, pady=4)
+        self._gemini_test_label = ttk.Label(gm_frame, text="", foreground="gray")
+        self._gemini_test_label.pack(anchor=tk.W)
+
+
+                    
+
+
+
+
+
 
     def _build_tab_advanced(self, nb: ttk.Notebook) -> None:
         f = self._tab(nb, "Advanced")
 
+        ttk.Label(f, text="Real-Time Processing", font=("", 9, "bold")).pack(anchor=tk.W, padx=_PAD, pady=(4, 2))
+        self._check(f, "Enable Real-Time Transcription Preview", "enable_realtime")
+        self._spin(f, "Update Frequency (ms)", "realtime_frequency_ms", 300, 3000, 100,
+                   "How often the audio is chunked and transcribed (default 800ms).\n"
+                   "Lower values increase CPU usage but feel more responsive.")
+                   
+        ttk.Separator(f).pack(fill=tk.X, padx=_PAD, pady=_PAD)
+        ttk.Label(f, text="General", font=("", 9, "bold")).pack(anchor=tk.W, padx=_PAD, pady=(0, 2))
         self._check(f, "Spoken punctuation (\"period\" → \".\")", "spoken_punctuation")
         self._check(f, "Auto-capitalise after sentence ends", "auto_capitalise")
         self._combo(f, "Text injection method", "inject_method",
@@ -465,55 +500,63 @@ class SettingsWindow:
         
         ttk.Label(f, text="Text Polish Settings", font=("", 10, "bold")).pack(
             anchor=tk.W, padx=_PAD, pady=(_PAD, 2))
+        _hint(f, "Send transcribed text to an AI model to clean up formatting, fix grammar, or rewrite text.")
         
-        # We need a local helper for hint since _hint is defined at module level
-        # but wait, _hint is already imported/defined.
-        
-        ttk.Label(f, text="Send transcribed text to an AI model to clean up formatting or grammar.", 
-                  foreground="gray").pack(anchor=tk.W, padx=_PAD)
-        ttk.Label(f, text="Logic for this tab will be built in the future.", 
-                  foreground="gray").pack(anchor=tk.W, padx=_PAD, pady=(0, 4))
         
         self._check(f, "Enable Polish mode", "enable_polish")
         
         self._combo(f, "Polish Provider", "polish_provider",
-                    ["none", "ollama", "third_party"],
-                    "Select the AI provider to use.")
+                    ["none", "ollama", "gemini"],
+                    "Ollama = local (private). Gemini = cloud (fast/accurate).")
                     
         self._combo(f, "Polish Action", "polish_action",
                     ["Fix Grammar & Spelling", "Make Professional", "Summarize", "Chat", "Custom Prompt"],
                     "What should the AI do with the dictated text?")
                     
-        ttk.Separator(f).pack(fill=tk.X, padx=_PAD, pady=_PAD)
-        ttk.Label(f, text="Ollama Settings (Local)", font=("", 9, "bold")).pack(anchor=tk.W, padx=_PAD)
+        # ── Custom Prompt Text Area ──────────────────────────────────
+        self._vars["custom_polish_prompt"] = tk.StringVar(value=str(self._cfg.get("custom_polish_prompt", "")))
+        cp_frame = ttk.Frame(f)
+        cp_frame.pack(fill=tk.X, padx=_PAD, pady=2)
+        ttk.Label(cp_frame, text="Custom Prompt:", width=15).pack(side=tk.LEFT, anchor=tk.N)
+        self._custom_prompt_text = tk.Text(cp_frame, height=3, width=40, font=("", 9))
+        self._custom_prompt_text.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        self._custom_prompt_text.insert("1.0", self._vars["custom_polish_prompt"].get())
         
-        # Ollama URL
+        def _on_text_change(event=None):
+            self._vars["custom_polish_prompt"].set(self._custom_prompt_text.get("1.0", "end-1c"))
+        self._custom_prompt_text.bind("<KeyRelease>", _on_text_change)
+
+        _hint(f, "Only used if 'Custom Prompt' is selected above.")
+        # ── Ollama Settings ───────────────────────────────────────────
+        ttk.Separator(f).pack(fill=tk.X, padx=_PAD, pady=_PAD)
+        ttk.Label(f, text="Local (Ollama)", font=("", 9, "bold")).pack(anchor=tk.W, padx=_PAD)
+        
         self._vars["ollama_url"] = tk.StringVar(value=str(self._cfg.get("ollama_url", "http://localhost:11434")))
-        url_frame = ttk.Frame(f)
-        url_frame.pack(fill=tk.X, padx=_PAD, pady=2)
-        ttk.Label(url_frame, text="Ollama URL:", width=_LABEL_W).pack(side=tk.LEFT)
-        ttk.Entry(url_frame, textvariable=self._vars["ollama_url"], width=30).pack(side=tk.LEFT)
-        ttk.Button(url_frame, text="Check Server", command=self._test_ollama_server).pack(side=tk.LEFT, padx=4)
+        url_row = ttk.Frame(f)
+        url_row.pack(fill=tk.X, padx=_PAD, pady=2)
+        ttk.Label(url_row, text="Server URL:", width=12).pack(side=tk.LEFT)
+        ttk.Entry(url_row, textvariable=self._vars["ollama_url"], width=30).pack(side=tk.LEFT)
+        ttk.Button(url_row, text="Ping", command=self._test_ollama_server, width=5).pack(side=tk.LEFT, padx=4)
         
         self._vars["polish_ollama_model"] = tk.StringVar(value=str(self._cfg.get("polish_ollama_model", "llama3")))
-        model_frame = ttk.Frame(f)
-        model_frame.pack(fill=tk.X, padx=_PAD, pady=2)
-        ttk.Label(model_frame, text="Ollama Model:", width=_LABEL_W).pack(side=tk.LEFT)
-        self._ollama_model_combo = ttk.Combobox(model_frame, textvariable=self._vars["polish_ollama_model"], 
+        mod_row = ttk.Frame(f)
+        mod_row.pack(fill=tk.X, padx=_PAD, pady=2)
+        ttk.Label(mod_row, text="Model:", width=12).pack(side=tk.LEFT)
+        self._ollama_model_combo = ttk.Combobox(mod_row, textvariable=self._vars["polish_ollama_model"], 
                                                 values=["llama3", "mistral", "gemma", "phi3"], 
                                                 width=28)
         self._ollama_model_combo.pack(side=tk.LEFT)
-        ttk.Button(model_frame, text="Refresh Models", command=self._refresh_ollama_models).pack(side=tk.LEFT, padx=4)
-                    
-        ttk.Separator(f).pack(fill=tk.X, padx=_PAD, pady=_PAD)
-        ttk.Label(f, text="Cloud Settings (Third-Party)", font=("", 9, "bold")).pack(anchor=tk.W, padx=_PAD)
-        self._combo(f, "Cloud Provider", "polish_cloud_provider",
-                    ["google", "openai", "anthropic"],
-                    "Select the third-party cloud provider.")
+        ttk.Button(mod_row, text="↻", command=self._refresh_ollama_models, width=3).pack(side=tk.LEFT, padx=4)
         
-        self._combo(f, "Cloud Model", "polish_cloud_model",
-                    ["gemini-1.5-pro", "gemini-1.5-flash", "gpt-4o", "claude-3.5-sonnet"],
-                    "Select or type the model name for the cloud provider.")
+        # ── Gemini Settings ───────────────────────────────────────────
+        ttk.Separator(f).pack(fill=tk.X, padx=_PAD, pady=_PAD)
+        ttk.Label(f, text="Cloud (Gemini)", font=("", 9, "bold")).pack(anchor=tk.W, padx=_PAD)
+        
+        self._combo(f, "Gemini Model", "polish_gemini_model",
+                    ["gemini-flash-lite-latest", "gemini-2.0-flash-lite"],
+                    "Gemini Flash Lite is recommended for best speed.")
+        
+        _hint(f, "API Key is managed in the 'Cloud STT' tab.")
 
     def _test_ollama_server(self) -> None:
         url = self._vars["ollama_url"].get().strip()
@@ -795,6 +838,28 @@ class SettingsWindow:
                     parent=self._win,
                 )
 
+        raw_gemini_key = self._gemini_key_var.get().strip()
+        if raw_gemini_key and not raw_gemini_key.startswith("•"):
+            ok = self._sec.store_gemini_key(raw_gemini_key)
+            if not ok:
+                messagebox.showwarning(
+                    "Credential warning",
+                    "Failed to save the Gemini API key to Windows Credential Manager.",
+                    parent=self._win,
+                )
+
+        # ── Sarvam Limit Validation ──────────────────────────────────────────
+        if data.get("engine_mode") == "sarvam":
+            max_sec = data.get("max_record_seconds", 30)
+            if max_sec > 30:
+                messagebox.showwarning(
+                    "Sarvam AI Limit",
+                    f"Sarvam AI has a maximum audio limit of 30 seconds for real-time transcription.\n\n"
+                    f"Your current limit is set to {max_sec} seconds. Please reduce it in the 'Audio' tab "
+                    "to avoid '400 Bad Request' errors for long dictations.",
+                    parent=self._win
+                )
+
         self._apply_startup(bool(data.get("start_with_windows", False)))
         self._cfg.update(data)
         self._cfg.save()
@@ -838,39 +903,6 @@ class SettingsWindow:
 
         _MicTestDialog(parent=self._win, device_index=device_index)
 
-    def _test_azure(self) -> None:
-        self._azure_test_label.config(text="Testing…", foreground="gray")
-        self._win.update_idletasks()
-
-        def _run():
-            key = self._sec.get_azure_key()
-            region_var = self._vars.get("cloud_region")
-            region = region_var.get() if region_var else self._cfg.get("cloud_region")
-            if not key:
-                msg, colour = "No Azure key stored.", "red"
-            else:
-                from ..transcription.cloud_engine import CloudEngine
-                engine = CloudEngine(api_key=key, region=region)
-                ok = engine.load()
-                msg, colour = (
-                    (f"✓ Azure Speech connected (region: {region})", "green") if ok
-                    else ("✗ Connection failed — check key and region.", "red")
-                )
-            self._root.after(0, lambda: self._azure_test_label.config(
-                text=msg, foreground=colour))
-
-        threading.Thread(target=_run, daemon=True).start()
-
-    def _toggle_key_visibility(self) -> None:
-        current = self._key_entry.cget("show")
-        self._key_entry.config(show="" if current == "•" else "•")
-
-    def _clear_azure_key(self) -> None:
-        if messagebox.askyesno("Clear API key",
-                               "Remove the Azure API key from Windows Credential Manager?",
-                               parent=self._win):
-            self._sec.delete_azure_key()
-            self._azure_key_var.set("")
 
     def _apply_startup(self, enabled: bool) -> None:
         try:
@@ -928,6 +960,98 @@ class SettingsWindow:
         self._updater.check_now(_on_result)
 
     # ── Layout helpers ────────────────────────────────────────────────────────
+    def _test_azure(self) -> None:
+        key = self._sec.get_azure_key()
+        if not key:
+            self._azure_test_label.configure(text="❌ Please save an API key first", foreground="red")
+            return
+        self._azure_test_label.configure(text="⏳ Testing...", foreground="gray")
+        self._win.update_idletasks()
+        
+        def _run():
+            from ..transcription.azure_engine import AzureEngine
+            engine = AzureEngine()
+            engine.update_credentials(key, self._cfg.get("cloud_region", "eastus"))
+            ok, msg = engine.test_connection()
+            self._root.after(0, lambda: self._azure_test_label.configure(
+                text=f"{'✅' if ok else '❌'} {msg}", 
+                foreground="green" if ok else "red"
+            ))
+        threading.Thread(target=_run, daemon=True).start()
+
+    def _test_sarvam(self) -> None:
+        key = self._sec.get_sarvam_key()
+        if not key:
+            self._sarvam_test_label.configure(text="❌ Please save an API key first", foreground="red")
+            return
+        self._sarvam_test_label.configure(text="⏳ Testing...", foreground="gray")
+        self._win.update_idletasks()
+        
+        def _run():
+            from ..transcription.sarvam_engine import SarvamEngine
+            engine = SarvamEngine()
+            engine.update_credentials(key)
+            ok, msg = engine.test_connection()
+            self._root.after(0, lambda: self._sarvam_test_label.configure(
+                text=f"{'✅' if ok else '❌'} {msg}", 
+                foreground="green" if ok else "red"
+            ))
+        threading.Thread(target=_run, daemon=True).start()
+
+    def _test_gemini(self) -> None:
+        key = self._sec.get_gemini_key()
+        if not key:
+            self._gemini_test_label.configure(text="❌ Please save an API key first", foreground="red")
+            return
+        self._gemini_test_label.configure(text="⏳ Testing...", foreground="gray")
+        self._win.update_idletasks()
+        
+        def _run():
+            from ..transcription.gemini_engine import GeminiEngine
+            engine = GeminiEngine()
+            engine.update_credentials(key)
+            ok, msg = engine.test_connection()
+            self._root.after(0, lambda: self._gemini_test_label.configure(
+                text=f"{'✅' if ok else '❌'} {msg}", 
+                foreground="green" if ok else "red"
+            ))
+        threading.Thread(target=_run, daemon=True).start()
+
+    def _toggle_key_visibility(self) -> None:
+        if self._az_entry["show"] == "•":
+            self._az_entry.configure(show="")
+            self._azure_key_var.set(self._sec.get_azure_key() or "")
+        else:
+            self._az_entry.configure(show="•")
+            key = self._sec.get_azure_key() or ""
+            display = ("•" * 12 + key[-4:]) if len(key) > 4 else key
+            self._azure_key_var.set(display)
+
+    def _toggle_sarvam_key_visibility(self) -> None:
+        if self._sa_entry["show"] == "•":
+            self._sa_entry.configure(show="")
+            self._sarvam_key_var.set(self._sec.get_sarvam_key() or "")
+        else:
+            self._sa_entry.configure(show="•")
+            key = self._sec.get_sarvam_key() or ""
+            display = ("•" * 12 + key[-4:]) if len(key) > 4 else key
+            self._sarvam_key_var.set(display)
+
+    def _toggle_gemini_key_visibility(self) -> None:
+        if self._gm_entry["show"] == "•":
+            self._gm_entry.configure(show="")
+            self._gemini_key_var.set(self._sec.get_gemini_key() or "")
+        else:
+            self._gm_entry.configure(show="•")
+            key = self._sec.get_gemini_key() or ""
+            display = ("•" * 12 + key[-4:]) if len(key) > 4 else key
+            self._gemini_key_var.set(display)
+
+    def _clear_sarvam_key(self) -> None:
+        if messagebox.askyesno("Clear Sarvam Key", "Remove the Sarvam API key from this machine?", parent=self._win):
+            self._sec.delete_sarvam_key()
+            self._sarvam_key_var.set("")
+            self._status_var.set("Sarvam key cleared.")
 
     def _centre_window(self) -> None:
         w = self._win.winfo_reqwidth()

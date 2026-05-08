@@ -20,6 +20,7 @@ _SERVICE = "DictateAnywhere"
 # Credential identifiers
 AZURE_SPEECH_KEY = "azure_speech_api_key"
 SARVAM_API_KEY = "sarvam_api_key"
+GEMINI_API_KEY = "gemini_api_key"
 
 
 class SecureStorage:
@@ -94,6 +95,20 @@ class SecureStorage:
 
     def has_sarvam_key(self) -> bool:
         return self.exists(SARVAM_API_KEY)
+
+    # ── Named helpers — Gemini ────────────────────────────────────────────────
+
+    def store_gemini_key(self, api_key: str) -> bool:
+        return self.store(GEMINI_API_KEY, api_key)
+
+    def get_gemini_key(self) -> Optional[str]:
+        return self.retrieve(GEMINI_API_KEY)
+
+    def delete_gemini_key(self) -> bool:
+        return self.delete(GEMINI_API_KEY)
+
+    def has_gemini_key(self) -> bool:
+        return self.exists(GEMINI_API_KEY)
 
     # ── Diagnostics ───────────────────────────────────────────────────────────
 

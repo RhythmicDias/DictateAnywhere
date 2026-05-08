@@ -7,7 +7,47 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
-## [Unreleased]
+## [1.5.0] - 2026-05-08
+
+### Added
+
+#### GPU-Accelerated Local Transcription (`transcription/local_engine.py`, `main.py`)
+- **CUDA/cuBLAS Support**: Enabled full hardware acceleration for the `faster-whisper` engine, leveraging NVIDIA RTX GPUs (e.g., RTX 5060) for near-instant transcription.
+- **Automated DLL Discovery**: Implemented a Windows-specific DLL injector in `main.py` that automatically scans the virtual environment for NVIDIA libraries (`cublas`, `cudnn`) and registers them with the system path.
+- **Robust Fallback Engine**: Enhanced the `LocalEngine` with a multi-stage fallback strategy. If CUDA initialization or execution fails (due to missing drivers or DLLs), the engine now automatically downgrades to **CPU / int8** mode without crashing.
+- **Real-Time Concurrency Locking**: Added thread synchronization to prevent race conditions when simultaneous real-time and final transcriptions access the same model instance.
+
+#### Optimal Defaults & Performance
+- **New Default Configuration**: Updated the standard out-of-the-box settings to the "Sweet Spot" for performance:
+  - **Model**: `tiny` (blazing fast)
+  - **Compute**: `int8` (memory efficient)
+  - **Device**: `cuda` (GPU prioritized with auto-fallback)
+- **Environment Stabilisation**: Forced `OMP_NUM_THREADS=1` and `MKL_NUM_THREADS=1` to prevent library-level deadlocks common on multi-core Windows machines.
+
+### Fixed
+- **Settings Sync**: Resolved a critical bug where changes to the `local_device` setting in the UI were not being propagated to the running transcription engine.
+- **MKL Hangs**: Implemented `KMP_DUPLICATE_LIB_OK` fixes to resolve silent hangs during model initialization on Windows.
+
+---
+
+## [1.4.0] - 2026-05-07
+
+### Added
+
+#### Real-Time Streaming Transcription (`main.py`, `ui/preview_window.py`)
+- **Live Previews**: Dictated text now appears instantaneously in the preview overlay as you speak, before you even finish the sentence.
+- **Engine-Level Streaming**: Integrated **Sarvam AI WebSocket** support for ultra-low latency real-time transcription.
+- **Configurable Frequency**: Users can adjust how often the real-time preview updates (default 800ms) in Settings → Advanced.
+- **UI Persistence**: The preview overlay now intelligently remains visible through the entire lifecycle: Listening → Transcribing → LLM Polishing → Text Injection.
+
+#### Sarvam AI Enhancements (`transcription/sarvam_engine.py`)
+- **WebSocket Protocol**: Fully transitioned the Sarvam engine from polling (REST) to persistent streaming (WebSockets).
+- **Language Mapping**: Automatic conversion of short codes (e.g., `hi`, `ml`) to Sarvam-compatible `-IN` codes (`hi-IN`, `ml-IN`).
+- **Connection Diagnostics**: Added a "Test Sarvam Connection" button in settings to verify API keys and network status.
+
+### Fixed
+- **Overlay Flicker**: Resolved an issue where the preview window would disappear prematurely during heavy LLM polishing.
+- **Installation Issues**: Fixed a "poisoned" `requirements.txt` that contained absolute machine paths and incorrect encoding.
 
 ---
 

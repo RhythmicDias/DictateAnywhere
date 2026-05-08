@@ -363,6 +363,8 @@ class TimedCapture:
         max_seconds: int = 30,
         sample_rate: int = TARGET_RATE,
         on_level: Optional[Callable[[float], None]] = None,
+        on_chunk: Optional[Callable[[bytes], None]] = None,
+        chunk_interval_ms: int = 800,
     ) -> None:
         self._vad = vad
         self._on_complete = on_complete
@@ -370,6 +372,8 @@ class TimedCapture:
         self._silence_timeout = silence_timeout_ms / 1000.0
         self._max_seconds = max_seconds
         self._on_level = on_level
+        self._on_chunk = on_chunk
+        self._chunk_interval = chunk_interval_ms / 1000.0
 
         self._capture: Optional[AudioCapture] = None
         self._thread: Optional[threading.Thread] = None
@@ -395,12 +399,22 @@ class TimedCapture:
     def _run(self) -> None:
         last_speech_time = time.monotonic()
         start_time = time.monotonic()
+        last_chunk_time = start_time
 
         while not self._stop_event.is_set():
-            elapsed = time.monotonic() - start_time
+            now = time.monotonic()
+            elapsed = now - start_time
             if elapsed > self._max_seconds:
                 logger.info("Max recording duration reached (%.0f s)", self._max_seconds)
                 break
+                
+            if self._on_chunk and (now - last_chunk_time) >= self._chunk_interval:
+                last_chunk_time = now
+                if self._capture:
+                    with self._capture._frames_lock:
+                        chunk_bytes = b"".join(self._capture._all_frames)
+                    if chunk_bytes:
+                        self._on_chunk(chunk_bytes)
 
             frame = self._capture.read_frames(timeout=0.1)  # type: ignore[union-attr]
             if not frame:

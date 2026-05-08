@@ -47,12 +47,14 @@ class Config:
 
     # ── Engine ───────────────────────────────────────────────────────────────
     engine_mode: str = "hybrid"          # "local" | "cloud" | "hybrid"
-    model_size: str = "small"            # tiny | base | small | medium | large
+    model_size: str = "tiny"             # tiny | base | small | medium | large
     language: str = "en"                 # BCP-47 language code
     compute_type: str = "int8"           # int8 | float16 | float32 (CPU efficiency)
+    local_device: str = "cuda"           # cpu | cuda | auto
     cloud_region: str = "eastus"         # Azure region
     sarvam_model: str = "saarika:v2.5"   # Sarvam model (saarika:v2.5 | saaras:v3)
     sarvam_language: str = "hi-IN"       # Default Indian language for Sarvam
+    enable_sarvam_websocket: bool = True # Use WebSocket for real-time transcription
 
 
     # ── Audio ─────────────────────────────────────────────────────────────────
@@ -91,6 +93,7 @@ class Config:
 
     # ── Cloud fallback ────────────────────────────────────────────────────────
     cloud_fallback_on_error: bool = True  # fall back to cloud if local fails
+    cloud_fallback_provider: str = "azure" # azure | gemini | sarvam
     local_fallback_on_cloud_error: bool = True
 
     # ── UI theme ──────────────────────────────────────────────────────────────
@@ -104,15 +107,26 @@ class Config:
     last_update_check: str = ""          # ISO date (YYYY-MM-DD) of last check
     skipped_update_version: str = ""    # release tag the user chose to skip
 
+    # ── Cloud STT Settings ────────────────────────────────────────────────────
+    sarvam_model: str = "saarika:v2.5"
+    sarvam_language: str = "hi-IN"
+    enable_sarvam_websocket: bool = True
+    
+    gemini_stt_model: str = "gemini-flash-lite-latest"
+    gemini_stt_language: str = "en"
+
     # ── Text Polish ───────────────────────────────────────────────────────────
     enable_polish: bool = False
     polish_provider: str = "ollama"
     polish_action: str = "Fix Grammar & Spelling"
+    custom_polish_prompt: str = "Rewrite this text to be more concise."
     ollama_url: str = "http://localhost:11434"
     polish_ollama_model: str = "llama3"
-    polish_cloud_provider: str = "google"
-    polish_cloud_model: str = "gemini-1.5-pro"
-    polish_api_key: str = ""
+    polish_gemini_model: str = "gemini-flash-lite-latest"
+
+    # ── Real-time Transcription ───────────────────────────────────────────────
+    enable_realtime: bool = False
+    realtime_frequency_ms: int = 800
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

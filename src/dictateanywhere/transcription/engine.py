@@ -11,7 +11,7 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Optional
+from typing import Optional, Callable
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +77,21 @@ class STTEngine(ABC):
         Return True if the engine can be used right now
         (model loaded / API key present / network reachable).
         """
+
+    def start_stream(self, on_text: Callable[[str], None], language: str = "en") -> None:
+        """
+        Start a persistent streaming session if supported.
+        *on_text* is called with partial/tentative transcriptions.
+        """
+        pass
+
+    def stop_stream(self) -> None:
+        """Stop the current streaming session."""
+        pass
+
+    def send_chunk(self, audio_bytes: bytes) -> None:
+        """Send a chunk of audio to the active stream."""
+        pass
 
     def unload(self) -> None:
         """Release resources. Override if needed."""

@@ -10,24 +10,27 @@ Powered by [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (offline,
 
 | Feature | Details |
 |---|---|
-| **Hybrid STT** | Offline faster-whisper + Azure Speech cloud fallback |
+| **Hybrid STT** | Offline faster-whisper (CPU/GPU) + Azure Speech / Sarvam AI cloud fallback |
+| **GPU Accelerated** | High-performance transcription via CUDA/cuBLAS for NVIDIA RTX GPUs |
+| **Real-Time Previews** | Live text appears in the overlay as you speak (sub-second latency) |
+| **Sarvam AI Support** | High-performance STT for Indian languages via WebSocket streaming |
+| **LLM Text Polishing** | Integrated with local Ollama to automatically fix grammar, rewrite, or act as a conversational assistant |
 | **Always available** | System tray icon — lives quietly in your taskbar |
-| **Floating mic button** | Draggable, always-on-top, semi-transparent toggle with modern, crisp icons for all states |
+| **Floating mic button** | Draggable, always-on-top toggle with modern, crisp icons for all states |
 | **Countdown ring** | Sweep arc on the mic button shows remaining recording time (green → amber → red) |
 | **Global hotkey** | Configurable (default `Ctrl+Alt+D`), toggle or push-to-talk |
 | **Types anywhere** | Injects text at your cursor in any Windows app |
-| **Transcription preview** | Floating dark overlay shows last 3 dictated lines in real time |
-| **Live level meter** | 16-segment LED bar in the preview overlay shows mic amplitude while recording |
+| **Transcription preview** | Floating dark overlay shows live tentative text and last 3 dictated lines |
+| **Live level meter** | smooth live waveform visualizer in the preview overlay shows mic amplitude |
 | **Spoken punctuation** | "period" → `.`  "comma" → `,`  "new line" → `↵`  etc. |
 | **Auto-capitalisation** | Capitalises after sentence endings automatically |
 | **Word corrections** | Persistent find-and-replace rules applied after every transcription |
 | **Session history** | Searchable log of every dictated utterance — copy, export, or clear |
 | **Auto-update checker** | Silently checks GitHub Releases at startup; notifies when a new version is available |
 | **VAD filtering** | WebRTC Voice Activity Detection — CPU only active while you speak |
-| **LLM Text Polishing** | Integrated with local Ollama to automatically fix grammar, rewrite, or act as a conversational assistant |
-| **Secure key storage** | Azure API key stored in Windows Credential Manager (DPAPI) |
+| **Secure key storage** | API keys stored in Windows Credential Manager (DPAPI) |
 | **Model selector** | tiny / base / **small** (recommended) / medium / large |
-| **Multi-language** | 20+ languages via Whisper; English is default |
+| **Multi-language** | 20+ languages via Whisper; specialized Indian support via Sarvam |
 | **Start with Windows** | Optional registry key entry |
 | **Standalone .exe** | Build with PyInstaller — no Python install needed for end-users |
 
@@ -139,8 +142,9 @@ Open **Settings** from the tray icon menu. Changes take effect immediately.
 
 ### Engine tab
 - **Engine mode** — `hybrid` (recommended), `local`, or `cloud`
-- **Whisper model size** — `small` is the best CPU/accuracy tradeoff
-- **Compute type** — `int8` for fastest CPU inference
+- **Whisper model size** — `tiny` is the fastest; `small` is the best CPU/accuracy tradeoff
+- **Compute type** — `int8` (efficient) or `float16` (fastest for GPU)
+- **Local device** — `cuda` (recommended for NVIDIA) or `cpu`
 - **Language** — BCP-47 code (`en`, `fr`, `de`, `auto`, …)
 
 ### Audio tab
@@ -190,6 +194,19 @@ The free tier of Azure Speech gives you **5 hours of transcription per month at 
 3. Copy your **Key 1** and **Region**
 4. In DictateAnywhere Settings → Azure Cloud tab, paste the key and set the region
 5. The key is encrypted by Windows and never touches disk in plain text
+
+---
+
+## Sarvam AI (Indian Language specialized STT)
+
+For the best experience with Hindi, Malayalam, Tamil, etc., DictateAnywhere integrates with [Sarvam AI](https://www.sarvam.ai/).
+
+1. Get an API key from the [Sarvam AI Dashboard](https://www.sarvam.ai/).
+2. In DictateAnywhere **Settings → Sarvam AI** tab:
+   - Paste your **API Key** (stored securely in Windows Credential Manager).
+   - Select your preferred model (e.g., `saaras:v3`).
+   - Enable **WebSocket Streaming** for ultra-low latency real-time transcription.
+3. Switch the **Engine Mode** to `sarvam` in the Engine tab.
 
 ---
 
@@ -304,7 +321,8 @@ DictateAnywhere/
 - [ ] Per-app language profiles (e.g. English for Word, French for LibreOffice)
 - [ ] Multi-monitor floating widget awareness
 - [ ] macOS / Linux support (pynput instead of pywin32)
-- [ ] GPU acceleration support (CUDA via CTranslate2)
+- [x] Real-time streaming transcription (Local & Sarvam WebSocket)
+- [x] GPU acceleration support (CUDA via CTranslate2)
 - [ ] Noise floor auto-calibration
 - [ ] Custom wake word to start recording hands-free
 

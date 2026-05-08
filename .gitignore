@@ -55,6 +55,8 @@ logs/
 
 # ─── User config & secrets (NEVER commit these) ───────────────────────────────
 config.json
+corrections.json
+history.db
 *.key
 *.pem
 secrets.txt

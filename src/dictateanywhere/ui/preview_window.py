@@ -61,6 +61,7 @@ class PreviewWindow:
         self._main_frame:   Optional[tk.Frame]  = None
 
     def show_text(self, text: str) -> None:
+        self._tentative_text = ""
         if not text.strip():
             return
         self._history.append(text.strip())
@@ -68,24 +69,52 @@ class PreviewWindow:
             return
         self._ensure_window()
         self._refresh()
+        # Only auto-hide once the final text is actually shown
         self._schedule_auto_hide()
 
-    def set_listening(self, active: bool) -> None:
-        self._listening = active
-        if not active:
-            self._level = 0.0
-            self._level_history = deque([0.0] * 40, maxlen=40)
-        
+    def show_tentative_text(self, text: str) -> None:
+        self._tentative_text = text.strip()
         if not self._cfg.get("show_preview_window", True):
             return
-            
-        if active:
+        self._ensure_window()
+        self._refresh()
+        self._cancel_auto_hide()
+
+    def show_status(self, status: str) -> None:
+        """Show a temporary status message (e.g. Polishing...) without changing history."""
+        self._tentative_text = ""
+        if not self._cfg.get("show_preview_window", True):
+            return
+        self._ensure_window()
+        self._status_text = status
+        self._refresh()
+        self._cancel_auto_hide()
+
+    def set_state(self, state: str) -> None:
+        self._status_text = ""
+        if state == "active":
+            self._listening = True
             self._cancel_auto_hide()
             self._history.clear()
-            self._ensure_window()
-        self._refresh()
-        if not active:
+            self._tentative_text = ""
+            if self._cfg.get("show_preview_window", True):
+                self._ensure_window()
+        elif state == "loading":
+            self._listening = False
+            self._level = 0.0
+            self._cancel_auto_hide()
+        elif state == "idle":
+            self._listening = False
+            self._level = 0.0
+            self._tentative_text = ""
             self._schedule_auto_hide()
+        elif state == "error":
+            self._listening = False
+            self._level = 0.0
+            self._tentative_text = ""
+            self._schedule_auto_hide()
+            
+        self._refresh()
 
     def set_level(self, rms: float) -> None:
         self._level = rms
@@ -115,15 +144,27 @@ class PreviewWindow:
     def _ensure_window(self) -> None:
         if self._win and self._win.winfo_exists():
             if not self._visible:
+                # deiconify can steal focus, alpha 0 trick helps
+                self._win.attributes("-alpha", 0.0)
                 self._win.deiconify()
+                self._win.attributes("-alpha", 0.85)
                 self._visible = True
             return
 
         win = tk.Toplevel(self._root)
         win.overrideredirect(True)
-        win.wm_attributes("-topmost", True)
-        win.wm_attributes("-alpha", 0.85)
-        win.wm_attributes("-transparentcolor", _TRANS_COLOUR)
+        win.attributes("-topmost", True)
+        win.attributes("-alpha", 0.85)
+        win.attributes("-transparentcolor", _TRANS_COLOUR)
+        
+        # Windows-specific: prevent the window from appearing in taskbar or taking focus
+        try:
+            win.attributes("-toolwindow", True)
+            # -noactivate is a Tcl/Tk 8.6+ Windows attribute that prevents focus on click/show
+            win.attributes("-noactivate", True)
+        except:
+            pass
+
         win.configure(bg=_TRANS_COLOUR)
         win.resizable(False, False)
 
@@ -195,9 +236,21 @@ class PreviewWindow:
                 )
                 lbl.pack(fill=tk.X, padx=_PAD_X, pady=1)
                 self._text_labels.append(lbl)
+                
+            self._tentative_lbl = tk.Label(
+                self._main_frame, text="", font=_FONT_BODY,
+                bg=_BG, fg=_ACCENT, anchor=tk.W, justify=tk.LEFT,
+                wraplength=_WIDTH - 24 - (_PAD_X * 2)
+            )
+            self._tentative_lbl.pack(fill=tk.X, padx=_PAD_X, pady=2)
 
         # Header text
-        if self._listening:
+        status_to_show = getattr(self, '_status_text', "")
+        if status_to_show:
+            self._status_lbl.configure(text=f"●  {status_to_show}", fg=_ACCENT)
+        elif getattr(self, '_tentative_text', ""):
+            self._status_lbl.configure(text="●  Transcribing…", fg=_ACCENT)
+        elif self._listening:
             self._status_lbl.configure(text="●  Listening…", fg=_ACCENT)
         elif self._history:
             self._status_lbl.configure(text="Last Dictation", fg=_FG_HINT)
@@ -213,6 +266,14 @@ class PreviewWindow:
             else:
                 lbl.pack(fill=tk.X, padx=_PAD_X, pady=2)
                 lbl.configure(text=text, fg=_FG_NEWEST if i == _MAX_HISTORY-1 else _FG_OLDER)
+                
+        # Tentative text label
+        t_text = getattr(self, '_tentative_text', "")
+        if t_text:
+            self._tentative_lbl.pack(fill=tk.X, padx=_PAD_X, pady=2)
+            self._tentative_lbl.configure(text=t_text)
+        else:
+            self._tentative_lbl.pack_forget()
 
         # Dynamic height adjustment
         self._win.update_idletasks()

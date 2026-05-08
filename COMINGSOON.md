@@ -7,22 +7,26 @@ Enhancement ideas ranked by user impact and implementation complexity.
 
 ---
 
-## 🚀 High Impact — Next Release Candidates
+---
+
+## ✅ Recently Completed
 
 ### E-01 · GPU / CUDA acceleration (RTX 5060)
-**Module:** `transcription/local_engine.py`
-Currently hardcoded to `device="cpu"`. faster-whisper supports CTranslate2 CUDA backend.
-- Auto-detect CUDA capability; fall back to CPU
-- Expose `device` in config (`auto` | `cpu` | `cuda`)
-- Expected 4–8× speedup on medium/large models
+**Status:** Completed in v1.5.0. 
+- Integrated `faster-whisper` with CTranslate2 CUDA backend.
+- Automated DLL discovery for NVIDIA libraries on Windows.
+- Multi-stage fallback to CPU/int8 on initialization failure.
+- Default settings optimized for GPU performance.
 
 ### E-02 · Streaming / real-time transcription
-**Module:** `transcription/`, `main.py`
-Currently waits for full utterance to finish before transcribing.
-- Process audio chunks in real-time while user is speaking
-- Show partial text in the preview overlay with a "tentative" style
-- Final correction pass on silence timeout
-- Dramatically improves perceived latency
+**Status:** Completed in v1.4.0.
+- Implemented real-time partial results via Sarvam AI WebSockets.
+- Integrated live audio processing with the preview overlay.
+- Dynamic waveform visualizer for real-time mic monitoring.
+
+---
+
+## 🚀 High Impact — Next Release Candidates
 
 ### E-03 · Multi-segment continuous dictation
 **Module:** `main.py`, `audio/capture.py`
@@ -204,3 +208,24 @@ Let users mark dictated text as "correct" or "incorrect" in the preview/history.
 - Builds a local dataset of corrections
 - Could auto-generate correction rules
 - Anonymized stats: accuracy rate over time
+
+## ⚡ Performance & Snappiness
+
+### E-27 · Latency Fix Plan (Snappy Dictation)
+**Module:** `transcription/gemini_engine.py`, `main.py`, `core/polish.py`
+Transform the sequential "Batch" workflow into a concurrent "Streaming" pipeline to rival professional solutions.
+
+1.  **WebSocket Migration (Gemini Live API)**:
+    - Replace REST `generateContent` with Gemini Multimodal Live API (WebSockets).
+    - **Goal:** Real-time partial results as the user speaks (identical to the Sarvam experience).
+2.  **Overlapped "Streaming Polish"**:
+    - Trigger the Polish AI as soon as the first stable sentence is received from the STT stream.
+    - **Goal:** Finish polishing within <500ms of the user releasing the hotkey.
+3.  **Instant Visual Feedback (Local/Cloud Hybrid)**:
+    - Run `faster-whisper` (tiny/base) locally in parallel with the Cloud engine.
+    - Show local text instantly (<100ms) and "swap" it with high-quality Cloud text when ready.
+4.  **Opus/AAC Audio Compression**:
+    - Encode audio chunks on-the-fly to reduce upload bandwidth by 10-15x.
+    - **Goal:** Significant reduction in "Initial Delay" for users with slower upload speeds.
+5.  **Partial Injection**:
+    - Optional "Live Inject" mode that types text as it arrives, then "fixes" formatting/grammar after the fact.

@@ -17,6 +17,8 @@
 | I-05 | Push-to-talk ignores modifier keys | `hotkey_manager.py` | ✅ Modifier check added |
 | I-06 | Azure double-encoding (WAV over PCM) | `cloud_engine.py` | ✅ Push raw PCM |
 | I-07 | Global mousewheel binding in corrections | `settings_window.py` | ✅ Scoped via Enter/Leave |
+| I-27 | CUDA `cublas64_12.dll` not found on Windows | `main.py` | ✅ Auto DLL discovery/injection |
+| I-28 | MKL nested thread deadlock on Windows | `main.py` | ✅ Thread limit overrides (OMP/MKL=1) |
 
 ---
 

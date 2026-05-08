@@ -45,7 +45,7 @@ def get_ollama_models(url: str) -> List[str]:
         return []
 
 
-def polish_text_ollama(text: str, url: str, model: str, action: str) -> str:
+def polish_with_ollama(text: str, url: str, model: str, action: str, custom_prompt: str = "") -> str:
     """
     Send text to Ollama for polishing.
     """
@@ -65,8 +65,11 @@ def polish_text_ollama(text: str, url: str, model: str, action: str) -> str:
     elif action == "Chat":
         system_prompt = "You are a helpful and conversational AI assistant. Respond directly and naturally to the user's input."
         prompt = text
+    elif action == "Custom Prompt" and custom_prompt:
+        system_prompt = "You are a helpful text-processing assistant. Output ONLY the processed text."
+        prompt = f"{custom_prompt}\n\nText:\n{text}"
     else:
-        # Custom prompt or default
+        # Fallback or generic
         system_prompt = "You are a helpful text-processing assistant. Output ONLY the processed text."
         prompt = f"Please process the following text according to this rule: {action}.\n\nText:\n{text}"
 
@@ -100,3 +103,76 @@ def polish_text_ollama(text: str, url: str, model: str, action: str) -> str:
         logger.error(f"Ollama polish failed: {e}")
         # Fallback to the original text if polishing fails
         return text
+
+def polish_with_gemini(text: str, api_key: str, model: str, action: str, custom_prompt: str = "") -> str:
+    """
+    Send text to Google Gemini for polishing.
+    """
+    if not text.strip() or not api_key:
+        return text
+
+    # Define prompts based on action
+    if action == "Fix Grammar & Spelling":
+        system_prompt = "Act as a concise text editor. Fix grammar, punctuation, and spelling. Do not change the tone. Output ONLY the corrected text. No explanations."
+        user_input = text
+    elif action == "Make Professional":
+        system_prompt = "You are a professional business copywriter."
+        user_input = f"Rewrite the following text to sound highly professional, clear, and concise. Suitable for a business email or formal document. Output ONLY the rewritten text without any conversational filler.\n\nText:\n{text}"
+    elif action == "Summarize":
+        system_prompt = "You are a summarization assistant."
+        user_input = f"Provide a brief summary of the following text. Output ONLY the summary.\n\nText:\n{text}"
+    elif action == "Chat":
+        system_prompt = "You are a helpful and conversational AI assistant. Respond directly and naturally to the user's input."
+        user_input = text
+    elif action == "Custom Prompt" and custom_prompt:
+        system_prompt = "You are a helpful text-processing assistant. Output ONLY the processed text."
+        user_input = f"{custom_prompt}\n\nText:\n{text}"
+    else:
+        system_prompt = "You are a helpful text-processing assistant. Output ONLY the processed text."
+        user_input = f"Please process the following text according to this rule: {action}.\n\nText:\n{text}"
+
+    # Gemini Flash Lite supports system instructions in the request
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+    
+    payload = {
+        "contents": [{
+            "parts": [{"text": user_input}]
+        }],
+        "system_instruction": {
+            "parts": [{"text": system_prompt}]
+        },
+        "generationConfig": {
+            "temperature": 0.2,
+            "topP": 0.8,
+            "topK": 40,
+            "maxOutputTokens": 2048,
+        }
+    }
+
+    try:
+        resp = requests.post(url, json=payload, timeout=60.0)
+        resp.raise_for_status()
+        result = resp.json()
+        
+        # Extract the text from Gemini response structure
+        # candidates[0].content.parts[0].text
+        candidates = result.get("candidates", [])
+        if not candidates:
+            return text
+            
+        polished = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "").strip()
+        
+        # Strip potential markdown code blocks if the model wrapped the response
+        if polished.startswith("```") and polished.endswith("```"):
+            lines = polished.splitlines()
+            if len(lines) > 2:
+                polished = "\n".join(lines[1:-1]).strip()
+
+        return polished if polished else text
+
+    except Exception as e:
+        msg = str(e)
+        if api_key:
+            msg = msg.replace(api_key, "***")
+        logger.error(f"Gemini polish failed: {msg}")
+        return text # Return original text on failure
