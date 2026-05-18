@@ -164,13 +164,6 @@ Smooth colour transitions between idle → active → loading states using inter
 - Fade from blue to red over 200 ms instead of instant snap
 - Adds a premium feel to the microphone button
 
-### E-21 · Mini waveform visualizer in the preview overlay
-**Module:** `ui/preview_window.py`
-Replace or complement the LED bar with a smooth waveform.
-- Rolling 2-second window of audio amplitude
-- Rendered on a `tk.Canvas` with anti-aliased lines
-- More visually engaging than discrete segments
-
 ### E-22 · Keyboard shortcut cheat sheet overlay
 **Module:** NEW `ui/cheatsheet.py`
 Toggle a quick-reference overlay showing all spoken commands.
@@ -207,7 +200,7 @@ One-click "Generate report" button in Settings → Advanced.
 Let users mark dictated text as "correct" or "incorrect" in the preview/history.
 - Builds a local dataset of corrections
 - Could auto-generate correction rules
-- Anonymized stats: accuracy rate over time
+---
 
 ## ⚡ Performance & Snappiness
 
@@ -217,6 +210,19 @@ Transform the sequential "Batch" workflow into a concurrent "Streaming" pipeline
 
 1.  **WebSocket Migration (Gemini Live API)**:
     - Replace REST `generateContent` with Gemini Multimodal Live API (WebSockets).
+    - **Goal:** Real-time partial results as the user speaks (identical to the Sarvam experience).
+2.  **Overlapped "Streaming Polish"**:
+    - Trigger the Polish AI as soon as the first stable sentence is received from the STT stream.
+    - **Goal:** Finish polishing within <500ms of the user releasing the hotkey.
+3.  **Instant Visual Feedback (Local/Cloud Hybrid)**:
+    - Run `faster-whisper` (tiny/base) locally in parallel with the Cloud engine.
+    - Show local text instantly (<100ms) and "swap" it with high-quality Cloud text when ready.
+4.  **Opus/AAC Audio Compression**:
+    - Encode audio chunks on-the-fly to reduce upload bandwidth by 10-15x.
+    - **Goal:** Significant reduction in "Initial Delay" for users with slower upload speeds.
+5.  **Partial Injection**:
+    - Optional "Live Inject" mode that types text as it arrives, then "fixes" formatting/grammar after the fact.
+API (WebSockets).
     - **Goal:** Real-time partial results as the user speaks (identical to the Sarvam experience).
 2.  **Overlapped "Streaming Polish"**:
     - Trigger the Polish AI as soon as the first stable sentence is received from the STT stream.
