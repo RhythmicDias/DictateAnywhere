@@ -165,6 +165,7 @@ Open **Settings** from the tray icon menu. Changes take effect immediately.
 ### Preview tab
 - Enable or disable the transcription preview overlay
 - Configure the auto-hide delay (ms)
+- **Opacity & Color** — customize the overlay's transparency and text color for better visibility
 
 ### Corrections tab
 - Add, edit, and remove word correction rules
@@ -182,6 +183,37 @@ Open **Settings** from the tray icon menu. Changes take effect immediately.
 - Start with Windows
 - Log level
 - **Updates section** — enable/disable automatic update checks; "Check now" button for an on-demand check
+
+---
+
+## AI Text Polishing (Ollama & Gemini)
+
+Transform your speech in real-time using Large Language Models.
+
+### Local via Ollama
+1. Install [Ollama](https://ollama.com/)
+2. Download a model (e.g., `ollama run llama3`)
+3. In DictateAnywhere **Settings → Polish**, select `ollama` and pick your model.
+
+### Cloud via Google Gemini
+1. Get an API key from [Google AI Studio](https://aistudio.google.com/)
+2. In DictateAnywhere **Settings → Cloud STT**, paste your Gemini API key.
+3. In **Settings → Polish**, select `gemini` and choose a model (e.g., `gemini-flash-lite-latest`).
+
+### Translation & Custom Prompts
+Use the **Custom Prompt** action to turn DictateAnywhere into a real-time translator or specialized assistant.
+- **Example Prompt:** "Translate the following text to Spanish and output ONLY the translation."
+- **Example Prompt:** "Format the following text as a SQL query."
+
+---
+
+## Google Gemini (Cloud STT)
+
+DictateAnywhere supports Google's Gemini models for highly accurate, multi-language cloud transcription.
+
+1. Get a free-tier API key from [Google AI Studio](https://aistudio.google.com/).
+2. Paste the key in the **Cloud STT** tab.
+3. Switch your **Engine Mode** to `gemini` in the Engine tab.
 
 ---
 
