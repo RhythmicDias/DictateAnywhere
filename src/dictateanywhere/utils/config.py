@@ -47,7 +47,7 @@ class Config:
 
     # ── Engine ───────────────────────────────────────────────────────────────
     engine_mode: str = "hybrid"          # "local" | "cloud" | "hybrid"
-    model_size: str = "tiny"             # tiny | base | small | medium | large
+    model_size: str = "small"            # tiny | base | small | medium | large
     language: str = "en"                 # BCP-47 language code
     compute_type: str = "int8"           # int8 | float16 | float32 (CPU efficiency)
     local_device: str = "cuda"           # cpu | cuda | auto
@@ -102,6 +102,8 @@ class Config:
     # ── Transcription preview overlay ─────────────────────────────────────────
     show_preview_window: bool = True     # show floating preview after dictation
     preview_hide_after_ms: int = 8000   # ms before overlay auto-hides (0 = never)
+    preview_opacity: float = 0.85       # 0.1 – 1.0
+    preview_text_color: str = "#ffffff" # hex color for newest text
 
     # ── Update checker ────────────────────────────────────────────────────────
     last_update_check: str = ""          # ISO date (YYYY-MM-DD) of last check

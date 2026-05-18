@@ -636,6 +636,9 @@ class DictateAnywhere:
         self._gemini_engine._model = self._cfg.get("gemini_stt_model")
         self._gemini_engine._language = self._cfg.get("gemini_stt_language")
 
+        # Overlay settings
+        self._preview.refresh_settings()
+
         logger.info("Settings applied to live components")
 
     # ── State broadcast ────────────────────────────────────────────────────────

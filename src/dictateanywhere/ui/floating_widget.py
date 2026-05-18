@@ -15,6 +15,7 @@ import math
 import os
 import time
 import tkinter as tk
+import ctypes
 from typing import Callable, Optional
 
 from PIL import Image, ImageTk
@@ -78,6 +79,18 @@ class FloatingWidget:
         self._win.configure(bg="#010101")
         self._win.attributes("-transparentcolor", "#010101")
         self._win.geometry(f"{size}x{size}+{x}+{y}")
+        
+        # Windows-specific: prevent focus activation
+        try:
+            self._win.attributes("-noactivate", True)
+            GWL_EXSTYLE = -20
+            WS_EX_NOACTIVATE = 0x08000000
+            hwnd = self._win.winfo_id()
+            style = ctypes.windll.user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
+            ctypes.windll.user32.SetWindowLongW(hwnd, GWL_EXSTYLE, style | WS_EX_NOACTIVATE)
+        except:
+            pass
+
         self._win.withdraw()
 
         # Canvas fills the entire window

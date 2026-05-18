@@ -17,6 +17,7 @@ from __future__ import annotations
 import logging
 import math
 import tkinter as tk
+import ctypes
 from collections import deque
 from typing import Optional
 
@@ -30,7 +31,6 @@ _FONT_BODY     = ("Segoe UI Semibold", 11)
 _FONT_HINT     = ("Segoe UI", 9)
 _BG            = "#1a1a1a"
 _ACCENT        = "#4fc3f7"   # ice blue
-_FG_NEWEST     = "#ffffff"
 _FG_OLDER      = "#888888"
 _FG_HINT       = "#666666"
 _PAD_X         = 20
@@ -134,6 +134,13 @@ class PreviewWindow:
             self._win.withdraw()
         self._visible = False
 
+    def refresh_settings(self) -> None:
+        """Apply live updates for opacity and color if the window exists."""
+        if self._win and self._win.winfo_exists():
+            alpha = self._cfg.get("preview_opacity", 0.85)
+            self._win.attributes("-alpha", alpha)
+            self._refresh()
+
     def destroy(self) -> None:
         self._cancel_auto_hide()
         if self._win and self._win.winfo_exists():
@@ -147,23 +154,34 @@ class PreviewWindow:
                 # deiconify can steal focus, alpha 0 trick helps
                 self._win.attributes("-alpha", 0.0)
                 self._win.deiconify()
-                self._win.attributes("-alpha", 0.85)
+                alpha = self._cfg.get("preview_opacity", 0.85)
+                self._win.attributes("-alpha", alpha)
                 self._visible = True
             return
 
         win = tk.Toplevel(self._root)
         win.overrideredirect(True)
         win.attributes("-topmost", True)
-        win.attributes("-alpha", 0.85)
+        alpha = self._cfg.get("preview_opacity", 0.85)
+        win.attributes("-alpha", alpha)
         win.attributes("-transparentcolor", _TRANS_COLOUR)
         
         # Windows-specific: prevent the window from appearing in taskbar or taking focus
         try:
+            # -toolwindow removes from taskbar
             win.attributes("-toolwindow", True)
-            # -noactivate is a Tcl/Tk 8.6+ Windows attribute that prevents focus on click/show
+            # -noactivate prevents taking focus on show/click (Tk 8.6.6+)
             win.attributes("-noactivate", True)
-        except:
-            pass
+            
+            # Force WS_EX_NOACTIVATE via Win32 API to be absolutely sure
+            # This prevents the window from stealing focus even when deiconified.
+            GWL_EXSTYLE = -20
+            WS_EX_NOACTIVATE = 0x08000000
+            hwnd = win.winfo_id()
+            style = ctypes.windll.user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
+            ctypes.windll.user32.SetWindowLongW(hwnd, GWL_EXSTYLE, style | WS_EX_NOACTIVATE)
+        except Exception as e:
+            logger.debug("Failed to set window styles: %s", e)
 
         win.configure(bg=_TRANS_COLOUR)
         win.resizable(False, False)
@@ -265,7 +283,8 @@ class PreviewWindow:
                 lbl.pack_forget()
             else:
                 lbl.pack(fill=tk.X, padx=_PAD_X, pady=2)
-                lbl.configure(text=text, fg=_FG_NEWEST if i == _MAX_HISTORY-1 else _FG_OLDER)
+                fg = self._cfg.get("preview_text_color", "#ffffff")
+                lbl.configure(text=text, fg=fg if i == _MAX_HISTORY-1 else _FG_OLDER)
                 
         # Tentative text label
         t_text = getattr(self, '_tentative_text', "")

@@ -58,25 +58,30 @@ class HotkeyManager:
         if self._registered:
             return True
         try:
+            hk = self._hotkey.strip().lower()
+            # Determine if we should suppress the key.
+            # We only suppress if it's a single key (like F9).
+            # For combos (like ctrl+alt+d), we don't suppress because:
+            # 1. The keyboard library has a bug on Windows where it can block the base key (e.g. 'd').
+            # 2. Complex combos are unlikely to interfere with normal app usage if passed through.
+            suppress = "+" not in hk
+
             if self._mode == "push_to_talk":
-                keyboard.on_press_key(
-                    self._hotkey.split("+")[-1],
-                    self._on_push_down,
-                    suppress=True,
+                # Use add_hotkey for both down and up events to benefit from 
+                # the library's internal modifier state tracking.
+                keyboard.add_hotkey(
+                    hk, self._on_push_down, suppress=suppress, trigger_on_release=False
                 )
-                keyboard.on_release_key(
-                    self._hotkey.split("+")[-1],
-                    self._on_push_up,
-                    suppress=True,
+                keyboard.add_hotkey(
+                    hk, self._on_push_up, suppress=suppress, trigger_on_release=True
                 )
             else:
                 keyboard.add_hotkey(
-                    self._hotkey,
-                    self._on_toggle,
-                    suppress=True,
+                    hk, self._on_toggle, suppress=suppress
                 )
+            
             self._registered = True
-            logger.info("Hotkey registered: %r (mode=%s)", self._hotkey, self._mode)
+            logger.info("Hotkey registered: %r (mode=%s, suppress=%s)", hk, self._mode, suppress)
             return True
         except Exception as exc:
             logger.error("Failed to register hotkey %r: %s", self._hotkey, exc)
@@ -87,12 +92,8 @@ class HotkeyManager:
         if not self._registered:
             return
         try:
-            if self._mode == "push_to_talk":
-                # Remove only the specific key hooks we set
-                trigger_key = self._hotkey.split("+")[-1]
-                keyboard.unhook_key(trigger_key)
-            else:
-                keyboard.remove_hotkey(self._hotkey)
+            # remove_hotkey removes all listeners matching the combo string
+            keyboard.remove_hotkey(self._hotkey.strip().lower())
         except Exception:
             pass
         self._registered = False
@@ -146,12 +147,8 @@ class HotkeyManager:
                 if self._on_stop:
                     threading.Thread(target=self._on_stop, daemon=True).start()
 
-    def _on_push_down(self, event) -> None:
-        # Verify all modifier keys are currently pressed
-        parts = self._hotkey.lower().split("+")
-        modifiers = parts[:-1]  # everything except the trigger key
-        if modifiers and not all(keyboard.is_pressed(m) for m in modifiers):
-            return
+    def _on_push_down(self, event=None) -> None:
+        # Note: add_hotkey handles modifier verification internally
         with self._lock:
             if not self._active:
                 self._active = True
@@ -159,12 +156,8 @@ class HotkeyManager:
                 if self._on_start:
                     threading.Thread(target=self._on_start, daemon=True).start()
 
-    def _on_push_up(self, event) -> None:
-        # Verify the full combo was in effect
-        parts = self._hotkey.lower().split("+")
-        modifiers = parts[:-1]
-        if modifiers and not all(keyboard.is_pressed(m) for m in modifiers):
-            return
+    def _on_push_up(self, event=None) -> None:
+        # Note: add_hotkey handles modifier verification internally
         with self._lock:
             if self._active:
                 self._active = False

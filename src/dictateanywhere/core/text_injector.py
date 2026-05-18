@@ -134,10 +134,7 @@ class TextInjector:
             event = (Input * 1)(Input(INPUT_KEYBOARD, Input_I(ki=ki)))
             user32.SendInput(1, event, ctypes.sizeof(Input))
         
-        # 4. Clear any active menu state (Esc)
-        user32.keybd_event(0x1B, 0, 0, 0) # Escape down
-        user32.keybd_event(0x1B, 0, KEYEVENTF_KEYUP, 0) # Escape up
-        
+        # 4. Small delay for OS to process key releases
         time.sleep(0.05)
 
     # ── Clipboard retry helper ──────────────────────────────────────────────
@@ -212,12 +209,8 @@ class TextInjector:
             def _send_v():
                 user32 = ctypes.windll.user32
                 
-                # Pre-paste safety: Tap Escape twice to clear any stuck menus or dialogs
-                # in the target application (especially Notepad/Office)
-                for _ in range(2):
-                    user32.keybd_event(0x1B, 0, 0, 0) # Escape down
-                    user32.keybd_event(0x1B, 0, KEYEVENTF_KEYUP, 0) # Escape up
-                    time.sleep(0.05)
+                # Small delay to ensure any transient UI state settles
+                time.sleep(0.05)
 
                 # Ensure Ctrl is down
                 ki_ctrl_down = KeyBdInput(VK_CONTROL, 0, 0, 0, 0)

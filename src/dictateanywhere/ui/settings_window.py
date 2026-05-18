@@ -13,7 +13,7 @@ import shutil
 import threading
 import tkinter as tk
 from pathlib import Path
-from tkinter import messagebox, ttk
+from tkinter import colorchooser, messagebox, ttk
 from typing import Callable, Optional
 
 logger = logging.getLogger(__name__)
@@ -223,18 +223,6 @@ class SettingsWindow:
                     "Toggle: press once to start, again to stop.\n"
                     "Push-to-talk: hold key to record, release to transcribe.")
 
-    def _build_tab_widget(self, nb: ttk.Notebook) -> None:
-        f = self._tab(nb, "Floating Button")
-        self._check(f, "Show floating mic button", "show_floating_widget")
-        self._check(f, "Always on top", "widget_always_on_top")
-        self._spin(f, "Button size (px)", "widget_size", 32, 128, 8,
-                   "Width and height of the floating button in pixels.")
-        self._scale(f, "Opacity", "widget_opacity", 0.1, 1.0, 0.05,
-                    "1.0 = fully opaque; 0.1 = nearly transparent.")
-        ttk.Separator(f).pack(fill=tk.X, padx=_PAD, pady=_PAD)
-        ttk.Label(f, text="Button position will be saved automatically as you drag it.",
-                  foreground="gray").pack(anchor=tk.W, padx=_PAD)
-
         # ── Transcription preview overlay ──────────────────────────────────
         ttk.Separator(f).pack(fill=tk.X, padx=_PAD, pady=_PAD)
         ttk.Label(f, text="Transcription Preview Overlay",
@@ -246,6 +234,36 @@ class SettingsWindow:
         self._spin(f, "Auto-hide after (ms)", "preview_hide_after_ms", 0, 30000, 1000,
                    "How long (milliseconds) the overlay stays visible after the last\n"
                    "utterance. Set to 0 to keep it open until manually closed.")
+
+        # Opacity (manual)
+        _row(f, "Overlay Opacity").pack(fill=tk.X)
+        self._vars["preview_opacity"] = tk.DoubleVar(value=float(self._cfg.get("preview_opacity", 0.85)))
+        op_frame = ttk.Frame(f)
+        op_frame.pack(anchor=tk.W, padx=_PAD, pady=2)
+        ttk.Entry(op_frame, textvariable=self._vars["preview_opacity"], width=10).pack(side=tk.LEFT)
+        ttk.Button(op_frame, text="Set", width=5, command=self._apply_preview_opacity).pack(side=tk.LEFT, padx=4)
+        _hint(f, "1.0 = fully opaque; 0.1 = nearly transparent.")
+
+        # Text Color
+        _row(f, "Text Color").pack(fill=tk.X)
+        self._vars["preview_text_color"] = tk.StringVar(value=str(self._cfg.get("preview_text_color", "#ffffff")))
+        col_frame = ttk.Frame(f)
+        col_frame.pack(anchor=tk.W, padx=_PAD, pady=2)
+        self._color_preview = tk.Label(col_frame, width=4, relief="ridge", bg=self._vars["preview_text_color"].get())
+        self._color_preview.pack(side=tk.LEFT, padx=(0, 4))
+        ttk.Button(col_frame, text="Pick Color...", command=self._pick_overlay_color).pack(side=tk.LEFT)
+
+    def _build_tab_widget(self, nb: ttk.Notebook) -> None:
+        f = self._tab(nb, "Floating Button")
+        self._check(f, "Show floating mic button", "show_floating_widget")
+        self._check(f, "Always on top", "widget_always_on_top")
+        self._spin(f, "Button size (px)", "widget_size", 32, 128, 8,
+                   "Width and height of the floating button in pixels.")
+        self._scale(f, "Opacity", "widget_opacity", 0.1, 1.0, 0.05,
+                    "1.0 = fully opaque; 0.1 = nearly transparent.")
+        ttk.Separator(f).pack(fill=tk.X, padx=_PAD, pady=_PAD)
+        ttk.Label(f, text="Button position will be saved automatically as you drag it.",
+                  foreground="gray").pack(anchor=tk.W, padx=_PAD)
 
     def _build_tab_cloud_stt(self, nb: ttk.Notebook) -> None:
         """Consolidated tab for all Cloud STT and AI Providers (Azure, Sarvam, Gemini)."""
@@ -902,6 +920,30 @@ class SettingsWindow:
                 device_index = None
 
         _MicTestDialog(parent=self._win, device_index=device_index)
+
+    def _pick_overlay_color(self) -> None:
+        current = self._vars["preview_text_color"].get()
+        _, hex_color = colorchooser.askcolor(initialcolor=current, title="Pick Overlay Text Color", parent=self._win)
+        if hex_color:
+            self._vars["preview_text_color"].set(hex_color)
+            self._color_preview.configure(bg=hex_color)
+            # Apply live
+            self._cfg.set("preview_text_color", hex_color)
+            if self._on_save:
+                self._on_save()
+
+    def _apply_preview_opacity(self) -> None:
+        try:
+            val = float(self._vars["preview_opacity"].get())
+            # Clamp or validate
+            if 0.05 <= val <= 1.0:
+                self._cfg.set("preview_opacity", val)
+                if self._on_save:
+                    self._on_save()
+            else:
+                messagebox.showwarning("Invalid Opacity", "Please enter a value between 0.1 and 1.0", parent=self._win)
+        except ValueError:
+            messagebox.showwarning("Invalid Opacity", "Please enter a numeric value", parent=self._win)
 
 
     def _apply_startup(self, enabled: bool) -> None:

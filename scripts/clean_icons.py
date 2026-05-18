@@ -19,7 +19,8 @@ def clean_to_circle(path):
     print(f"Cleaned {path} to circular mask")
 
 # Target icons
-icons_dir = r"d:\PythonProjects\DictateAnywhere\assets\icons"
+script_dir = os.path.dirname(os.path.abspath(__file__))
+icons_dir = os.path.join(script_dir, "..", "assets", "icons")
 for f in ["mic_idle.png", "mic_active.png", "mic_loading.png"]:
     path = os.path.join(icons_dir, f)
     if os.path.exists(path):

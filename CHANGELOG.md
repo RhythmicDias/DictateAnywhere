@@ -7,6 +7,34 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [1.6.1] - 2026-05-11
+
+### Fixed
+
+#### Focus Stability (`ui/preview_window.py`, `ui/floating_widget.py`)
+- **Non-Activating Windows**: Implemented `WS_EX_NOACTIVATE` via Win32 API for the preview overlay and floating mic button. This prevents these windows from stealing keyboard focus from the target application (e.g., Notepad, WhatsApp) when they appear or are clicked.
+- **Focus Stealing Prevention**: Reinforced UI components with the `-noactivate` attribute to ensure that showing/hiding the overlay doesn't interrupt the user's cursor position or text injection process.
+
+---
+
+## [1.6.0] - 2026-05-08
+
+### Added
+
+#### Overlay Customization (`ui/settings_window.py`, `ui/preview_window.py`)
+- **Visual Controls**: Added new settings to control the transparency (opacity) and text color of the transcription preview overlay.
+- **Manual Entry**: Opacity can now be set via manual numeric entry with a "Set" button for immediate live feedback.
+- **Color Picker**: Integrated a native color chooser for the overlay text, allowing for personalized themes (e.g., high-contrast or branded colors).
+- **Tab Realignment**: Moved all "Transcription Preview Overlay" settings to the **Hotkey** tab for better feature grouping.
+
+### Fixed
+
+#### Injection Stability (`core/text_injector.py`)
+- **WhatsApp Compatibility**: Fixed an issue where text injection failed in WhatsApp Desktop/Web by removing silent `Escape` key signals.
+- **Silent Key Suppression**: Removed redundant "Esc" presses that were inadvertently clearing input fields or closing search bars in modern messaging applications.
+
+---
+
 ## [1.5.0] - 2026-05-08
 
 ### Added
@@ -165,7 +193,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
-[Unreleased]: https://github.com/stephendias-NPD/DictateAnywhere/compare/v1.2.0...HEAD
-[1.2.0]: https://github.com/stephendias-NPD/DictateAnywhere/compare/v1.1.0...v1.2.0
-[1.1.0]: https://github.com/stephendias-NPD/DictateAnywhere/compare/v1.0.0...v1.1.0
-[1.0.0]: https://github.com/stephendias-NPD/DictateAnywhere/releases/tag/v1.0.0
+[Unreleased]: https://github.com/RhythmicDias/DictateAnywhere/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/RhythmicDias/DictateAnywhere/compare/v1.1.0...v1.2.0
+[1.1.0]: https://github.com/RhythmicDias/DictateAnywhere/compare/v1.0.0...v1.1.0
+[1.0.0]: https://github.com/RhythmicDias/DictateAnywhere/releases/tag/v1.0.0

@@ -5,14 +5,14 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "DictateAnywhere"
 version = "1.2.0"
-description = "Hybrid voice dictation for Windows — faster-whisper offline + Azure cloud STT"
+description = "Hybrid voice dictation for Windows — types anywhere using offline faster-whisper and Azure/Sarvam cloud backends"
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.11"
 authors = [
     { name = "DictateAnywhere Contributors" }
 ]
-keywords = ["dictation", "speech-to-text", "voice", "windows", "whisper", "azure"]
+keywords = ["dictation", "speech-to-text", "voice", "windows", "whisper", "azure", "sarvam", "ai"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Environment :: Win32 (MS Windows)",
@@ -40,10 +40,10 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/stephendias-NPD/DictateAnywhere"
-Repository = "https://github.com/stephendias-NPD/DictateAnywhere"
-"Bug Tracker" = "https://github.com/stephendias-NPD/DictateAnywhere/issues"
-Changelog = "https://github.com/stephendias-NPD/DictateAnywhere/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/RhythmicDias/DictateAnywhere"
+Repository = "https://github.com/RhythmicDias/DictateAnywhere"
+"Bug Tracker" = "https://github.com/RhythmicDias/DictateAnywhere/issues"
+Changelog = "https://github.com/RhythmicDias/DictateAnywhere/blob/main/CHANGELOG.md"
 
 [project.scripts]
 dictateanywhere = "dictateanywhere.main:main"

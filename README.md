@@ -1,8 +1,8 @@
 # DictateAnywhere
 
-**Hybrid voice dictation for Windows** — types wherever your cursor is, just like macOS Dictation.
+**Hybrid voice dictation for Windows** — types anywhere your cursor is using offline faster-whisper and Azure/Sarvam cloud backends.
 
-Powered by [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (offline, CPU-efficient) with optional [Azure Speech](https://azure.microsoft.com/en-us/products/ai-services/speech-to-text) cloud fallback for maximum accuracy.
+Powered by [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (offline, CPU-efficient) with optional [Azure Speech](https://azure.microsoft.com/en-us/products/ai-services/speech-to-text) or [Sarvam AI](https://www.sarvam.ai/) cloud fallback for maximum accuracy and multi-language support.
 
 ---
 
@@ -47,7 +47,7 @@ Powered by [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (offline,
 ### Install
 
 ```bat
-git clone https://github.com/stephendias-NPD/DictateAnywhere.git
+git clone https://github.com/RhythmicDias/DictateAnywhere.git
 cd DictateAnywhere
 
 scripts\create_venv.bat
@@ -212,7 +212,7 @@ For the best experience with Hindi, Malayalam, Tamil, etc., DictateAnywhere inte
 
 ## Auto-update checker
 
-DictateAnywhere silently checks [GitHub Releases](https://github.com/stephendias-NPD/DictateAnywhere/releases) at startup (after a 15-second delay) and shows a notification if a newer version is available.
+DictateAnywhere silently checks [GitHub Releases](https://github.com/RhythmicDias/DictateAnywhere/releases) at startup (after a 15-second delay) and shows a notification if a newer version is available.
 
 - **At most once per day** — subsequent launches that day skip the check
 - **Three choices when a new version is found:**

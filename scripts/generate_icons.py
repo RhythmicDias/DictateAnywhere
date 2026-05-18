@@ -12,7 +12,9 @@ SIZE   = 256      # canvas size
 HALF   = SIZE // 2
 RADIUS = HALF - 4 # outer circle radius (leaves 4px transparent padding)
 
-OUT_DIR = r"d:\PythonProjects\DictateAnywhere\assets\icons"
+# Resolve paths relative to script location
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+OUT_DIR    = os.path.join(SCRIPT_DIR, "..", "assets", "icons")
 
 # -- Colour palettes per state -------------------------------------------------
 STATES = {

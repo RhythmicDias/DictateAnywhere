@@ -33,9 +33,8 @@ from typing import Callable, Optional
 
 logger = logging.getLogger(__name__)
 
-_API_URL    = "https://api.github.com/repos/stephendias-NPD/DictateAnywhere/releases/latest"
-_RELEASES   = "https://github.com/stephendias-NPD/DictateAnywhere/releases/latest"
-_UA         = "DictateAnywhere-UpdateChecker/1.0"
+_API_URL    = "https://api.github.com/repos/RhythmicDias/DictateAnywhere/releases/latest"
+_RELEASES   = "https://github.com/RhythmicDias/DictateAnywhere/releases/latest"_UA         = "DictateAnywhere-UpdateChecker/1.0"
 _TIMEOUT    = 10          # seconds for the HTTP request
 _STARTUP_DELAY = 15       # seconds after launch before checking
 
