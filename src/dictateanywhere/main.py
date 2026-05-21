@@ -232,6 +232,15 @@ class DictateAnywhere:
 
         self._history = HistoryWindow(root=self._root)
 
+        self._floating.configure_context_menu(
+            on_start=self._start_dictation,
+            on_stop=self._stop_dictation,
+            on_open_settings=self._settings_win.open,
+            on_toggle_preview=self._preview.toggle_visibility,
+            on_open_history=self._history.open,
+            on_quit=self._quit,
+        )
+
         self._tray = TrayIcon(
             on_start_dictation=self._start_dictation,
             on_stop_dictation=self._stop_dictation,
