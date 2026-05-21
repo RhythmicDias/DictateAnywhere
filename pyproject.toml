@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "DictateAnywhere"
-version = "1.2.0"
+version = "1.2.1"
 description = "Hybrid voice dictation for Windows — types anywhere using offline faster-whisper and Azure/Sarvam cloud backends"
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -33,11 +33,13 @@ dependencies = [
     "keyring>=25.2.1",
     "pystray>=0.19.5",
     "Pillow>=10.4.0",
-    "keyboard>=0.13.5",
-    "pywin32>=311",
+    "keyboard>=0.13.5; sys_platform == 'win32'",
+    "pywin32>=311; sys_platform == 'win32'",
     "pyperclip>=1.9.0",
     "requests>=2.32.3",
+    "pynput>=1.7.6; sys_platform == 'darwin'",
 ]
+
 
 [project.urls]
 Homepage = "https://github.com/RhythmicDias/DictateAnywhere"
