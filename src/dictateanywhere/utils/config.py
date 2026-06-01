@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
@@ -22,10 +23,14 @@ CONFIG_VERSION = 2
 
 def app_data_dir() -> Path:
     """Return (and create) the per-user app data directory."""
-    base = os.environ.get("APPDATA") or Path.home() / "AppData" / "Roaming"
+    if sys.platform == "darwin":
+        base = Path.home() / "Library" / "Application Support"
+    else:
+        base = os.environ.get("APPDATA") or Path.home() / "AppData" / "Roaming"
     d = Path(base) / APP_NAME
     d.mkdir(parents=True, exist_ok=True)
     return d
+
 
 
 # Keep for backward compat — alias
@@ -129,6 +134,9 @@ class Config:
     # ── Real-time Transcription ───────────────────────────────────────────────
     enable_realtime: bool = False
     realtime_frequency_ms: int = 800
+
+    # ── App Launcher ──────────────────────────────────────────────────────────
+    app_launcher_commands: dict[str, str] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

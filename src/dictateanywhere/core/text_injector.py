@@ -1,85 +1,69 @@
-"""
-Text injection at the current cursor position.
-
-Strategy:
-  1. Save the current clipboard contents.
-  2. Copy the transcribed text to the clipboard.
-  3. Send Ctrl+V to paste it at the cursor.
-  4. Restore the original clipboard.
-
-Falls back to SendInput character-by-character for apps that block
-clipboard paste (e.g. some password managers, terminals).
-
-Windows-only (uses pywin32 and ctypes).
-"""
-
-from __future__ import annotations
-
-import ctypes
-from ctypes import wintypes
 import logging
+import sys
 import threading
 import time
 from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-# ── Windows API Structures ──────────────────────────────────────────────────
+# ── Windows-only Imports and Constants ──────────────────────────────────────
+if sys.platform == "win32":
+    import ctypes
+    from ctypes import wintypes
 
-class KeyBdInput(ctypes.Structure):
-    _fields_ = [
-        ("wVk", wintypes.WORD),
-        ("wScan", wintypes.WORD),
-        ("dwFlags", wintypes.DWORD),
-        ("time", wintypes.DWORD),
-        ("dwExtraInfo", ctypes.c_void_p),
-    ]
+    class KeyBdInput(ctypes.Structure):
+        _fields_ = [
+            ("wVk", wintypes.WORD),
+            ("wScan", wintypes.WORD),
+            ("dwFlags", wintypes.DWORD),
+            ("time", wintypes.DWORD),
+            ("dwExtraInfo", ctypes.c_void_p),
+        ]
 
-class HardwareInput(ctypes.Structure):
-    _fields_ = [
-        ("uMsg", wintypes.DWORD),
-        ("wParamL", wintypes.WORD),
-        ("wParamH", wintypes.WORD),
-    ]
+    class HardwareInput(ctypes.Structure):
+        _fields_ = [
+            ("uMsg", wintypes.DWORD),
+            ("wParamL", wintypes.WORD),
+            ("wParamH", wintypes.WORD),
+        ]
 
-class MouseInput(ctypes.Structure):
-    _fields_ = [
-        ("dx", wintypes.LONG),
-        ("dy", wintypes.LONG),
-        ("mouseData", wintypes.DWORD),
-        ("dwFlags", wintypes.DWORD),
-        ("time", wintypes.DWORD),
-        ("dwExtraInfo", ctypes.c_void_p),
-    ]
+    class MouseInput(ctypes.Structure):
+        _fields_ = [
+            ("dx", wintypes.LONG),
+            ("dy", wintypes.LONG),
+            ("mouseData", wintypes.DWORD),
+            ("dwFlags", wintypes.DWORD),
+            ("time", wintypes.DWORD),
+            ("dwExtraInfo", ctypes.c_void_p),
+        ]
 
-class Input_I(ctypes.Union):
-    _fields_ = [
-        ("ki", KeyBdInput), ("mi", MouseInput), ("hi", HardwareInput)
-    ]
+    class Input_I(ctypes.Union):
+        _fields_ = [
+            ("ki", KeyBdInput), ("mi", MouseInput), ("hi", HardwareInput)
+        ]
 
-class Input(ctypes.Structure):
-    _fields_ = [("type", ctypes.c_ulong), ("ii", Input_I)]
+    class Input(ctypes.Structure):
+        _fields_ = [("type", ctypes.c_ulong), ("ii", Input_I)]
 
+    # Windows Constants
+    VK_SHIFT = 0x10
+    VK_CONTROL = 0x11
+    VK_MENU = 0x12  # Alt
+    VK_LWIN = 0x5B
+    VK_RWIN = 0x5C
+    VK_V = 0x56
 
-# Windows Constants
-VK_SHIFT = 0x10
-VK_CONTROL = 0x11
-VK_MENU = 0x12  # Alt
-VK_LWIN = 0x5B
-VK_RWIN = 0x5C
-VK_V = 0x56
+    # Specific modifiers
+    VK_LSHIFT = 0xA0
+    VK_RSHIFT = 0xA1
+    VK_LCONTROL = 0xA2
+    VK_RCONTROL = 0xA3
+    VK_LMENU = 0xA4
+    VK_RMENU = 0xA5
 
-# Specific modifiers
-VK_LSHIFT = 0xA0
-VK_RSHIFT = 0xA1
-VK_LCONTROL = 0xA2
-VK_RCONTROL = 0xA3
-VK_LMENU = 0xA4
-VK_RMENU = 0xA5
-
-KEYEVENTF_KEYUP = 0x0002
-KEYEVENTF_UNICODE = 0x0004
-INPUT_KEYBOARD = 1
+    KEYEVENTF_KEYUP = 0x0002
+    KEYEVENTF_UNICODE = 0x0004
+    INPUT_KEYBOARD = 1
 
 
 class TextInjector:
@@ -94,24 +78,96 @@ class TextInjector:
         self._delay = delay_ms / 1000.0
         self._lock = threading.Lock()
 
-    # ── Helpers ────────────────────────────────────────────────────────────────
+    # ── macOS Helper and Injection Strategies ───────────────────────────────
+
+    def _release_modifiers_macos(self) -> None:
+        """Release Command, Control, Option, and Shift key states virtually on macOS."""
+        try:
+            from pynput.keyboard import Key, Controller
+            keyboard = Controller()
+            keyboard.release(Key.cmd)
+            keyboard.release(Key.ctrl)
+            keyboard.release(Key.alt)
+            keyboard.release(Key.shift)
+            time.sleep(0.05)
+        except Exception as exc:
+            logger.debug("Failed to release modifiers on macOS: %s", exc)
+
+    def _inject_macos_clipboard(self, text: str) -> bool:
+        try:
+            import pyperclip
+            from pynput.keyboard import Key, Controller
+            keyboard = Controller()
+
+            # Save current clipboard
+            old_content = None
+            try:
+                old_content = pyperclip.paste()
+            except Exception:
+                pass
+
+            # Set new clipboard content
+            pyperclip.copy(text)
+            logger.info("Injecting %d chars via macOS CLIPBOARD", len(text))
+
+            # Small delay so the target app registers the clipboard change
+            time.sleep(self._delay)
+
+            # Send Cmd+V using pynput
+            with keyboard.pressed(Key.cmd):
+                keyboard.press('v')
+                keyboard.release('v')
+
+            # Restore original clipboard after a delay
+            def _restore():
+                time.sleep(1.0)
+                try:
+                    if old_content is not None:
+                        pyperclip.copy(old_content)
+                except Exception:
+                    pass
+
+            threading.Thread(target=_restore, daemon=True).start()
+            logger.debug("Injected %d chars via macOS clipboard", len(text))
+            return True
+
+        except Exception as exc:
+            logger.error("macOS Clipboard injection failed: %s", exc)
+            return self._inject_macos_sendinput(text)
+
+    def _inject_macos_sendinput(self, text: str) -> bool:
+        """Use pynput Controller to type each character directly."""
+        try:
+            from pynput.keyboard import Controller
+            keyboard = Controller()
+            logger.info("Injecting %d chars via macOS SENDINPUT", len(text))
+            keyboard.type(text)
+            return True
+        except Exception as exc:
+            logger.error("macOS SendInput injection failed: %s", exc)
+            return False
+
+    # ── Windows Helpers ────────────────────────────────────────────────────────
 
     def _release_modifiers(self) -> None:
         """
         Wait for physical release and then virtually release Ctrl, Alt, Shift, and Win keys.
         """
+        if sys.platform != "win32":
+            return
+
         keys = [
             VK_CONTROL, VK_LCONTROL, VK_RCONTROL,
             VK_MENU, VK_LMENU, VK_RMENU,
             VK_SHIFT, VK_LSHIFT, VK_RSHIFT,
             VK_LWIN, VK_RWIN,
-            0x73, # F4 (The user's default hotkey)
+            # Function keys F1 - F12 (VK_F1 to VK_F12: 0x70 to 0x7B)
+            0x70, 0x71, 0x72, 0x73, 0x74, 0x75, 0x76, 0x77, 0x78, 0x79, 0x7A, 0x7B
         ]
         
         user32 = ctypes.windll.user32
         
         # 1. Wait for physical release (up to 1 second)
-        # This is critical for push-to-talk to avoid "stuck" keys during injection.
         t0 = time.monotonic()
         while time.monotonic() - t0 < 1.0:
             still_down = False
@@ -122,22 +178,40 @@ class TextInjector:
             if not still_down:
                 break
             time.sleep(0.01)
-            
-        # 2. Force logical release
+
+        # Determine which keys are actually physically down right now and need logical release
+        keys_to_release = []
         for vk in keys:
-            if user32.GetKeyState(vk) & 0x8000:
-                user32.keybd_event(vk, 0, KEYEVENTF_KEYUP, 0)
+            # Check only physical key state using GetAsyncKeyState (MSB set means key is down).
+            # GetKeyState is thread-local and unreliable in a background thread.
+            if user32.GetAsyncKeyState(vk) & 0x8000:
+                keys_to_release.append(vk)
+
+        # If Alt (VK_MENU, VK_LMENU, VK_RMENU) is being released, send dummy key 0xE8 to prevent menu activation
+        if any(vk in keys_to_release for vk in (VK_MENU, VK_LMENU, VK_RMENU)):
+            try:
+                ki_dummy_down = KeyBdInput(0xE8, 0, 0, 0, 0)
+                event_dummy_down = (Input * 1)(Input(INPUT_KEYBOARD, Input_I(ki=ki_dummy_down)))
+                user32.SendInput(1, event_dummy_down, ctypes.sizeof(Input))
+                
+                ki_dummy_up = KeyBdInput(0xE8, 0, KEYEVENTF_KEYUP, 0, 0)
+                event_dummy_up = (Input * 1)(Input(INPUT_KEYBOARD, Input_I(ki=ki_dummy_up)))
+                user32.SendInput(1, event_dummy_up, ctypes.sizeof(Input))
+            except Exception:
+                pass
+
+        # 2. Force logical release (only for keys that were actually down)
+        for vk in keys_to_release:
+            user32.keybd_event(vk, 0, KEYEVENTF_KEYUP, 0)
         
-        # 3. Batch release via SendInput
-        for vk in keys:
+        # 3. Batch release via SendInput (only for keys that were actually down)
+        for vk in keys_to_release:
             ki = KeyBdInput(vk, 0, KEYEVENTF_KEYUP, 0, 0)
             event = (Input * 1)(Input(INPUT_KEYBOARD, Input_I(ki=ki)))
             user32.SendInput(1, event, ctypes.sizeof(Input))
         
         # 4. Small delay for OS to process key releases
         time.sleep(0.05)
-
-    # ── Clipboard retry helper ──────────────────────────────────────────────
 
     @staticmethod
     def _open_clipboard_retry(max_attempts: int = 3, delay: float = 0.05) -> bool:
@@ -152,6 +226,8 @@ class TextInjector:
                     time.sleep(delay)
         return False
 
+    # ── Public API ─────────────────────────────────────────────────────────────
+
     def inject(self, text: str) -> bool:
         """
         Inject *text* at the current cursor position.
@@ -160,9 +236,14 @@ class TextInjector:
         if not text:
             return True
         with self._lock:
-            # Safety: Release modifiers to avoid hotkey interference
-            self._release_modifiers()
+            if sys.platform == "darwin":
+                self._release_modifiers_macos()
+                if self._method == "sendinput":
+                    return self._inject_macos_sendinput(text)
+                return self._inject_macos_clipboard(text)
 
+            # Windows-only flow
+            self._release_modifiers()
             if self._method == "sendinput":
                 return self._inject_sendinput(text)
             return self._inject_clipboard(text)
@@ -170,7 +251,7 @@ class TextInjector:
     def set_method(self, method: str) -> None:
         self._method = method
 
-    # ── Clipboard strategy ─────────────────────────────────────────────────────
+    # ── Windows-only Injection Strategies ──────────────────────────────────────
 
     def _inject_clipboard(self, text: str) -> bool:
         try:
@@ -260,8 +341,6 @@ class TextInjector:
             logger.error("Clipboard injection failed: %s", exc)
             return self._inject_sendinput(text)
 
-    # ── SendInput strategy (character-by-character) ────────────────────────────
-
     def _inject_sendinput(self, text: str) -> bool:
         """
         Use ctypes SendInput to inject each character directly.
@@ -297,3 +376,4 @@ class TextInjector:
         except Exception as exc:
             logger.error("SendInput injection failed: %s", exc)
             return False
+

@@ -13,7 +13,7 @@ import shutil
 import threading
 import tkinter as tk
 from pathlib import Path
-from tkinter import colorchooser, messagebox, ttk
+from tkinter import colorchooser, filedialog, messagebox, ttk
 from typing import Callable, Optional
 
 logger = logging.getLogger(__name__)
@@ -53,6 +53,17 @@ def _find_whisper_models() -> list[dict]:
             size_mb     = size_bytes / (1024 * 1024)
             results.append({"name": model_name, "path": folder, "size_mb": size_mb})
     return results
+
+
+def _set_window_icon(win: tk.Toplevel) -> None:
+    """Set the custom window icon on Windows using wm_iconbitmap."""
+    try:
+        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        ico_path = os.path.join(base_dir, "assets", "icon.ico")
+        if os.path.exists(ico_path):
+            win.wm_iconbitmap(ico_path)
+    except Exception as e:
+        logger.debug("Failed to set window icon: %s", e)
 
 
 class SettingsWindow:
@@ -106,6 +117,33 @@ class SettingsWindow:
         # Non-modal — user can still interact with floating widget and preview
         self._win.protocol("WM_DELETE_WINDOW", self.close)
 
+        _set_window_icon(self._win)
+
+        # Logo header
+        header = ttk.Frame(self._win)
+        header.pack(fill=tk.X, padx=_PAD, pady=(12, 4))
+        
+        self._logo_img = None
+        try:
+            base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+            logo_path = os.path.join(base_dir, "assets", "logo.png")
+            if os.path.exists(logo_path):
+                from PIL import Image, ImageTk
+                img = Image.open(logo_path)
+                # Resize keeping aspect ratio
+                h = 42
+                w = int(img.width * (h / img.height))
+                img = img.resize((w, h), Image.Resampling.LANCZOS)
+                self._logo_img = ImageTk.PhotoImage(img)
+                
+                logo_lbl = ttk.Label(header, image=self._logo_img)
+                logo_lbl.pack(anchor=tk.CENTER)
+            else:
+                # Fallback: title text
+                ttk.Label(header, text="DictateAnywhere", font=("Segoe UI", 16, "bold")).pack(pady=5)
+        except Exception as e:
+            logger.debug("Failed to load logo in settings: %s", e)
+
         nb = ttk.Notebook(self._win)
         nb.pack(fill=tk.BOTH, expand=True, padx=_PAD, pady=_PAD)
 
@@ -123,14 +161,17 @@ class SettingsWindow:
         self._build_tab_advanced(nb)
         self._build_tab_corrections(nb)
         self._build_tab_polish(nb)
+        self._build_tab_app_launcher(nb)
 
         bar = ttk.Frame(self._win)
         bar.pack(fill=tk.X, padx=_PAD, pady=(0, _PAD))
         ttk.Label(bar, textvariable=self._status_var, foreground="gray").pack(side=tk.LEFT)
-        ttk.Button(bar, text="Cancel", command=self.close).pack(side=tk.RIGHT, padx=4)
+        ttk.Button(bar, text="Close", command=self.close).pack(side=tk.RIGHT, padx=4)
         ttk.Button(bar, text="Save", command=self._save,
                    style="Accent.TButton").pack(side=tk.RIGHT)
         ttk.Button(bar, text="Reset Defaults", command=self._reset).pack(side=tk.RIGHT, padx=4)
+        ttk.Button(bar, text="Export Settings", command=self._export_settings).pack(side=tk.RIGHT, padx=4)
+        ttk.Button(bar, text="Import Settings", command=self._import_settings).pack(side=tk.RIGHT, padx=4)
 
         self._win.update_idletasks()
         self._centre_window()
@@ -223,17 +264,17 @@ class SettingsWindow:
                     "Toggle: press once to start, again to stop.\n"
                     "Push-to-talk: hold key to record, release to transcribe.")
 
-        # ── Transcription preview overlay ──────────────────────────────────
+        # ── Transcription status overlay ──────────────────────────────────
         ttk.Separator(f).pack(fill=tk.X, padx=_PAD, pady=_PAD)
-        ttk.Label(f, text="Transcription Preview Overlay",
+        ttk.Label(f, text="Transcription Status Overlay",
                   font=("", 9, "bold")).pack(anchor=tk.W, padx=_PAD)
-        _hint(f, "A floating dark bar that shows each dictated sentence.\n"
+        _hint(f, "A floating dark pill that shows the current dictation state and waveform.\n"
               "Appears at the bottom of the screen and fades away automatically.\n"
-              "Drag it by its header to reposition. Toggle anytime from the tray icon.")
-        self._check(f, "Show preview overlay after dictation", "show_preview_window")
+              "Drag it to reposition. Toggle anytime from the tray icon.")
+        self._check(f, "Show status overlay during dictation", "show_preview_window")
         self._spin(f, "Auto-hide after (ms)", "preview_hide_after_ms", 0, 30000, 1000,
-                   "How long (milliseconds) the overlay stays visible after the last\n"
-                   "utterance. Set to 0 to keep it open until manually closed.")
+                   "How long (milliseconds) the overlay stays visible after dictation stops.\n"
+                   "Set to 0 to keep it open until manually closed.")
 
         # Opacity (manual)
         _row(f, "Overlay Opacity").pack(fill=tk.X)
@@ -243,15 +284,6 @@ class SettingsWindow:
         ttk.Entry(op_frame, textvariable=self._vars["preview_opacity"], width=10).pack(side=tk.LEFT)
         ttk.Button(op_frame, text="Set", width=5, command=self._apply_preview_opacity).pack(side=tk.LEFT, padx=4)
         _hint(f, "1.0 = fully opaque; 0.1 = nearly transparent.")
-
-        # Text Color
-        _row(f, "Text Color").pack(fill=tk.X)
-        self._vars["preview_text_color"] = tk.StringVar(value=str(self._cfg.get("preview_text_color", "#ffffff")))
-        col_frame = ttk.Frame(f)
-        col_frame.pack(anchor=tk.W, padx=_PAD, pady=2)
-        self._color_preview = tk.Label(col_frame, width=4, relief="ridge", bg=self._vars["preview_text_color"].get())
-        self._color_preview.pack(side=tk.LEFT, padx=(0, 4))
-        ttk.Button(col_frame, text="Pick Color...", command=self._pick_overlay_color).pack(side=tk.LEFT)
 
     def _build_tab_widget(self, nb: ttk.Notebook) -> None:
         f = self._tab(nb, "Floating Button")
@@ -368,14 +400,7 @@ class SettingsWindow:
     def _build_tab_advanced(self, nb: ttk.Notebook) -> None:
         f = self._tab(nb, "Advanced")
 
-        ttk.Label(f, text="Real-Time Processing", font=("", 9, "bold")).pack(anchor=tk.W, padx=_PAD, pady=(4, 2))
-        self._check(f, "Enable Real-Time Transcription Preview", "enable_realtime")
-        self._spin(f, "Update Frequency (ms)", "realtime_frequency_ms", 300, 3000, 100,
-                   "How often the audio is chunked and transcribed (default 800ms).\n"
-                   "Lower values increase CPU usage but feel more responsive.")
-                   
-        ttk.Separator(f).pack(fill=tk.X, padx=_PAD, pady=_PAD)
-        ttk.Label(f, text="General", font=("", 9, "bold")).pack(anchor=tk.W, padx=_PAD, pady=(0, 2))
+        ttk.Label(f, text="General", font=("", 9, "bold")).pack(anchor=tk.W, padx=_PAD, pady=(4, 2))
         self._check(f, "Spoken punctuation (\"period\" → \".\")", "spoken_punctuation")
         self._check(f, "Auto-capitalise after sentence ends", "auto_capitalise")
         self._combo(f, "Text injection method", "inject_method",
@@ -575,6 +600,158 @@ class SettingsWindow:
                     "Gemini Flash Lite is recommended for best speed.")
         
         _hint(f, "API Key is managed in the 'Cloud STT' tab.")
+
+    def _build_tab_app_launcher(self, nb: ttk.Notebook) -> None:
+        f = self._tab(nb, "App Launcher")
+
+        ttk.Label(f, text="App Launcher Commands", font=("", 10, "bold")).pack(
+            anchor=tk.W, padx=_PAD, pady=(_PAD, 2))
+        _hint(f,
+              "Define voice command phrases to launch applications immediately instead of injecting text.\n"
+              "Example:  'open notepad' → 'C:\\Windows\\System32\\notepad.exe'")
+
+        # Initialize local commands cache
+        self._launcher_commands = dict(self._cfg.get("app_launcher_commands", {}))
+        self._launcher_row_widgets = []
+
+        # ── Scrollable list ────────────────────────────────────
+        list_outer = ttk.Frame(f, relief="sunken", borderwidth=1)
+        list_outer.pack(fill=tk.BOTH, expand=True, padx=_PAD, pady=(4, 0))
+
+        canvas = tk.Canvas(list_outer, height=180, borderwidth=0, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(list_outer, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        self._launcher_inner = ttk.Frame(canvas)
+        self._launcher_canvas_win = canvas.create_window((0, 0), window=self._launcher_inner, anchor="nw")
+
+        def _on_resize(event):
+            canvas.itemconfig(self._launcher_canvas_win, width=event.width)
+        canvas.bind("<Configure>", _on_resize)
+
+        def _update_scroll(event=None):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+        self._launcher_inner.bind("<Configure>", _update_scroll)
+
+        # Mouse-wheel scrolling
+        def _on_wheel(event):
+            canvas.yview_scroll(-1 * (event.delta // 120), "units")
+        def _bind_wheel(event):
+            canvas.bind_all("<MouseWheel>", _on_wheel)
+        def _unbind_wheel(event):
+            canvas.unbind_all("<MouseWheel>")
+        canvas.bind("<Enter>", _bind_wheel)
+        canvas.bind("<Leave>", _unbind_wheel)
+
+        # Column headers
+        hdr = ttk.Frame(self._launcher_inner)
+        hdr.pack(fill=tk.X, padx=4, pady=(4, 0))
+        ttk.Label(hdr, text="Voice Command", font=("", 8, "bold"), width=22).pack(side=tk.LEFT)
+        ttk.Label(hdr, text="→", width=3).pack(side=tk.LEFT)
+        ttk.Label(hdr, text="Application Path", font=("", 8, "bold")).pack(side=tk.LEFT)
+        ttk.Separator(self._launcher_inner).pack(fill=tk.X, padx=4, pady=2)
+
+        self._launcher_canvas = canvas
+        self._launcher_rows_frame = ttk.Frame(self._launcher_inner)
+        self._launcher_rows_frame.pack(fill=tk.X)
+        self._refresh_launcher_commands()
+
+        # ── Add new command row ─────────────────────────────────────────
+        ttk.Separator(f).pack(fill=tk.X, padx=_PAD, pady=(6, 2))
+        add_row = ttk.Frame(f)
+        add_row.pack(fill=tk.X, padx=_PAD, pady=(0, 2))
+        
+        ttk.Label(add_row, text="Command:", width=10).pack(side=tk.LEFT)
+        self._launcher_cmd_var = tk.StringVar()
+        ttk.Entry(add_row, textvariable=self._launcher_cmd_var, width=30).pack(side=tk.LEFT, padx=2)
+
+        path_row = ttk.Frame(f)
+        path_row.pack(fill=tk.X, padx=_PAD, pady=(2, _PAD))
+        
+        ttk.Label(path_row, text="Path:", width=10).pack(side=tk.LEFT)
+        self._launcher_path_var = tk.StringVar()
+        ttk.Entry(path_row, textvariable=self._launcher_path_var, width=30).pack(side=tk.LEFT, padx=2)
+        ttk.Button(path_row, text="Browse...", command=self._browse_app_path, width=10).pack(side=tk.LEFT, padx=2)
+        ttk.Button(path_row, text="Add", command=self._add_launcher_command, width=6).pack(side=tk.LEFT, padx=2)
+
+        self._launcher_status_var = tk.StringVar(value="")
+        ttk.Label(f, textvariable=self._launcher_status_var, foreground="gray").pack(anchor=tk.W, padx=_PAD)
+
+    def _browse_app_path(self) -> None:
+        path = filedialog.askopenfilename(
+            title="Select Application to Launch",
+            filetypes=[
+                ("Executables & Scripts", "*.exe;*.lnk;*.bat;*.cmd"),
+                ("All Files", "*.*")
+            ],
+            parent=self._win
+        )
+        if path:
+            formatted_path = os.path.normpath(path)
+            self._launcher_path_var.set(formatted_path)
+
+    def _refresh_launcher_commands(self) -> None:
+        for w in self._launcher_rows_frame.winfo_children():
+            w.destroy()
+        self._launcher_row_widgets = []
+
+        for cmd, path in sorted(self._launcher_commands.items()):
+            row = ttk.Frame(self._launcher_rows_frame)
+            row.pack(fill=tk.X, padx=4, pady=1)
+
+            cmd_var = tk.StringVar(value=cmd)
+            
+            display_path = path
+            if len(display_path) > 30:
+                display_path = "..." + display_path[-27:]
+            path_var = tk.StringVar(value=display_path)
+
+            ttk.Entry(row, textvariable=cmd_var, width=22, state="readonly").pack(side=tk.LEFT)
+            ttk.Label(row, text="→", width=3).pack(side=tk.LEFT)
+            ttk.Entry(row, textvariable=path_var, width=30, state="readonly").pack(side=tk.LEFT)
+
+            self._launcher_row_widgets.append({"cmd": cmd_var, "path": path_var})
+
+            ttk.Button(
+                row, text="Delete", width=7,
+                command=lambda k=cmd: self._delete_launcher_command(k),
+            ).pack(side=tk.RIGHT, padx=4)
+
+        self._launcher_rows_frame.update_idletasks()
+        if hasattr(self, "_launcher_canvas"):
+            self._launcher_canvas.configure(scrollregion=self._launcher_canvas.bbox("all"))
+
+    def _add_launcher_command(self) -> None:
+        cmd = self._launcher_cmd_var.get().strip()
+        path = self._launcher_path_var.get().strip()
+        
+        if not cmd:
+            self._launcher_status_var.set("Voice command phrase cannot be empty.")
+            return
+        if not path:
+            self._launcher_status_var.set("Application path cannot be empty.")
+            return
+        if not os.path.exists(path):
+            self._launcher_status_var.set("Warning: The target path does not exist.")
+
+        normalized_cmd = cmd.lower()
+        if normalized_cmd in {k.lower() for k in self._launcher_commands}:
+            self._launcher_status_var.set(f"Command '{cmd}' already exists.")
+            return
+
+        self._launcher_commands[cmd] = path
+        self._launcher_cmd_var.set("")
+        self._launcher_path_var.set("")
+        self._launcher_status_var.set(f"Added: '{cmd}' → {os.path.basename(path)}")
+        self._refresh_launcher_commands()
+
+    def _delete_launcher_command(self, cmd: str) -> None:
+        if cmd in self._launcher_commands:
+            self._launcher_commands.pop(cmd)
+            self._launcher_status_var.set(f"Deleted: '{cmd}'")
+            self._refresh_launcher_commands()
 
     def _test_ollama_server(self) -> None:
         url = self._vars["ollama_url"].get().strip()
@@ -878,6 +1055,7 @@ class SettingsWindow:
                     parent=self._win
                 )
 
+        data["app_launcher_commands"] = getattr(self, "_launcher_commands", {})
         self._apply_startup(bool(data.get("start_with_windows", False)))
         self._cfg.update(data)
         self._cfg.save()
@@ -885,6 +1063,58 @@ class SettingsWindow:
         logger.info("Settings saved by user")
         if self._on_save:
             self._on_save()
+
+    def _export_settings(self) -> None:
+        import json
+        path = filedialog.asksaveasfilename(
+            title="Export Settings",
+            defaultextension=".json",
+            filetypes=[("JSON Files", "*.json")],
+            parent=self._win
+        )
+        if not path:
+            return
+        try:
+            cfg_dict = self._cfg.config.to_dict()
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(cfg_dict, f, indent=2)
+            self._status_var.set("Settings exported successfully.")
+            messagebox.showinfo("Export Settings", "Settings exported successfully!", parent=self._win)
+        except Exception as e:
+            logger.error("Failed to export settings: %s", e)
+            messagebox.showerror("Export Error", f"Failed to export settings:\n{e}", parent=self._win)
+
+    def _import_settings(self) -> None:
+        import json
+        from ..utils.config import Config
+        path = filedialog.askopenfilename(
+            title="Import Settings",
+            filetypes=[("JSON Files", "*.json")],
+            parent=self._win
+        )
+        if not path:
+            return
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            
+            if not isinstance(data, dict):
+                raise ValueError("Invalid settings format (must be a JSON object).")
+                
+            self._cfg._config = Config.from_dict(data)
+            self._cfg.save()
+            
+            self._status_var.set("Settings imported successfully.")
+            messagebox.showinfo("Import Settings", "Settings imported successfully!", parent=self._win)
+            
+            self.close()
+            self.open()
+            
+            if self._on_save:
+                self._on_save()
+        except Exception as e:
+            logger.error("Failed to import settings: %s", e)
+            messagebox.showerror("Import Error", f"Failed to import settings:\n{e}", parent=self._win)
 
     def _reset(self) -> None:
         if messagebox.askyesno("Reset settings",
@@ -921,16 +1151,7 @@ class SettingsWindow:
 
         _MicTestDialog(parent=self._win, device_index=device_index)
 
-    def _pick_overlay_color(self) -> None:
-        current = self._vars["preview_text_color"].get()
-        _, hex_color = colorchooser.askcolor(initialcolor=current, title="Pick Overlay Text Color", parent=self._win)
-        if hex_color:
-            self._vars["preview_text_color"].set(hex_color)
-            self._color_preview.configure(bg=hex_color)
-            # Apply live
-            self._cfg.set("preview_text_color", hex_color)
-            if self._on_save:
-                self._on_save()
+
 
     def _apply_preview_opacity(self) -> None:
         try:

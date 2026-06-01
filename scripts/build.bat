@@ -22,6 +22,7 @@ echo.
 echo [DictateAnywhere] Building executable ...
 "%PYTHON%" -m PyInstaller ^
     --name "DictateAnywhere" ^
+    --icon "assets/icon.ico" ^
     --windowed ^
     --onedir ^
     --add-data "assets;assets" ^

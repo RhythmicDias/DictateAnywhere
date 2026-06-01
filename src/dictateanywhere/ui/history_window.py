@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import datetime
 import logging
+import os
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 from typing import List, Optional, Tuple
@@ -36,6 +37,17 @@ _FG_EMPTY   = "#aaaaaa"
 _BG_MAIN    = "#fafafa"
 _BG_MATCH   = "#fff176"    # vivid yellow — easy to spot
 _PAD        = 8
+
+
+def _set_window_icon(win: tk.Toplevel) -> None:
+    """Set the custom window icon on Windows using wm_iconbitmap."""
+    try:
+        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        ico_path = os.path.join(base_dir, "assets", "icon.ico")
+        if os.path.exists(ico_path):
+            win.wm_iconbitmap(ico_path)
+    except Exception as e:
+        logger.debug("Failed to set window icon: %s", e)
 
 
 class HistoryWindow:
@@ -79,6 +91,8 @@ class HistoryWindow:
         win.minsize(480, 300)
         # Hide instead of destroy so history survives re-opens
         win.protocol("WM_DELETE_WINDOW", win.withdraw)
+        
+        _set_window_icon(win)
 
         # ── Toolbar ───────────────────────────────────────────────────────
         toolbar = ttk.Frame(win, padding=(_PAD, _PAD, _PAD, 0))

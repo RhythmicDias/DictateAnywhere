@@ -7,6 +7,32 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [1.7.0] - 2026-06-01
+
+### Added
+
+#### Profile Import & Export (`ui/settings_window.py`)
+- **Import/Export Settings**: Added buttons to backup and load application settings profile to and from a JSON file.
+
+#### Voice App Launcher (`ui/settings_window.py`, `main.py`)
+- **Voice App Launcher**: Introduced a setting allowing users to bind custom voice triggers (e.g. "open notepad") to system application paths for instantaneous launch.
+
+#### Premium App Branding (`ui/settings_window.py`, `ui/history_window.py`, `ui/tray.py`, `assets/`)
+- **App Icons**: Integrated glowing neon microphone window icons into the settings and history dialog title bars and taskbar icons.
+- **App Logo Header**: Integrated a typography wordmark logo into the Settings Window header.
+- **Tray Status Dots**: Upgraded the system tray icon to use the high-quality glowing microphone icon, overlaid with neon status indicator dots corresponding to system states (Idle, Recording, Loading, Error).
+- **Standalone Icon compilation**: Configured `build.bat` to package the compiled `.exe` using the official `.ico` asset.
+
+### Fixed
+
+#### Windows Taskbar Grouping (`main.py`)
+- **Explicit App ID**: Set the process AppUserModelID on Windows, resolving a native grouping issue where Windows grouped the application under Python's default launcher icon in the taskbar.
+
+#### Notepad Alt-Key Focus Activation (`core/text_injector.py`)
+- **Alt-Key Suppression**: Resolved an issue where releasing hotkeys simulated Alt key releases that triggered Windows menu bar focus (especially in Notepad) and interrupted subsequent text injection.
+
+---
+
 ## [1.6.1] - 2026-05-11
 
 ### Fixed

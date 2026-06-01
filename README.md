@@ -32,6 +32,9 @@ Powered by [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (offline,
 | **Model selector** | tiny / base / **small** (recommended) / medium / large |
 | **Multi-language** | 20+ languages via Whisper; specialized Indian support via Sarvam |
 | **Start with Windows** | Optional registry key entry |
+| **App Launcher** | Bind custom voice triggers (e.g. "open notepad") to run local applications |
+| **Profile Sync** | Export and Import settings configurations to/from a JSON file |
+| **Premium Branding** | Glowing neon mic window and tray icons with live status indicator dots |
 | **Standalone .exe** | Build with PyInstaller — no Python install needed for end-users |
 
 ---
@@ -171,6 +174,9 @@ Open **Settings** from the tray icon menu. Changes take effect immediately.
 - Add, edit, and remove word correction rules
 - Rules are applied after every transcription in the order listed
 
+### App Launcher tab
+- Map spoken commands (e.g. "open notepad") to specific local application executable files to launch them instantly.
+
 ### Azure Cloud tab
 - Azure Speech API key (stored securely in Windows Credential Manager)
 - Azure region
@@ -181,6 +187,7 @@ Open **Settings** from the tray icon menu. Changes take effect immediately.
 - Toggle auto-capitalisation
 - Text injection method (clipboard or SendInput)
 - Start with Windows
+- **Backup & Sync** — "Export Settings" and "Import Settings" buttons at the bottom of the dialog box to save or load JSON profiles.
 - Log level
 - **Updates section** — enable/disable automatic update checks; "Check now" button for an on-demand check
 

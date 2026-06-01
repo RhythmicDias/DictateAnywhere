@@ -398,7 +398,66 @@ class FloatingWidget:
     def _get_position(self) -> tuple[int, int]:
         return self._win.winfo_x(), self._win.winfo_y()
 
+    # ── Context Menu ──────────────────────────────────────────────────────────
+
+    def configure_context_menu(
+        self,
+        on_start: Callable,
+        on_stop: Callable,
+        on_open_settings: Callable,
+        on_toggle_preview: Callable,
+        on_open_history: Callable,
+        on_quit: Callable,
+    ) -> None:
+        """Create and bind a right-click context menu on the widget canvas."""
+        self._on_start = on_start
+        self._on_stop = on_stop
+        self._on_settings = on_open_settings
+        self._on_toggle_preview = on_toggle_preview
+        self._on_history = on_open_history
+        self._on_quit = on_quit
+
+        # Create Tkinter popup menu
+        self._menu = tk.Menu(self._win, tearoff=0)
+        self._menu.add_command(label="Start Dictation", command=self._menu_start)
+        self._menu.add_command(label="Stop Dictation", command=self._menu_stop)
+        self._menu.add_separator()
+        self._menu.add_command(label="Toggle Preview Overlay", command=self._on_toggle_preview)
+        self._menu.add_command(label="Session History...", command=self._on_history)
+        self._menu.add_command(label="Settings...", command=self._on_settings)
+        self._menu.add_separator()
+        self._menu.add_command(label="Quit", command=self._on_quit)
+
+        # Bind right-click (Button-2 on macOS, Button-3 on Windows/Linux)
+        self._canvas.bind("<Button-2>", self._show_context_menu)
+        self._canvas.bind("<Button-3>", self._show_context_menu)
+
+    def _show_context_menu(self, event: tk.Event) -> None:
+        if not hasattr(self, "_menu"):
+            return
+        
+        # Enable/Disable start/stop options dynamically based on dictation state
+        if self._state == "active":
+            self._menu.entryconfig("Start Dictation", state=tk.DISABLED)
+            self._menu.entryconfig("Stop Dictation", state=tk.NORMAL)
+        else:
+            self._menu.entryconfig("Start Dictation", state=tk.NORMAL)
+            self._menu.entryconfig("Stop Dictation", state=tk.DISABLED)
+            
+        self._menu.post(event.x_root, event.y_root)
+
+    def _menu_start(self) -> None:
+        if hasattr(self, "_on_start") and self._on_start:
+            import threading
+            threading.Thread(target=self._on_start, daemon=True).start()
+
+    def _menu_stop(self) -> None:
+        if hasattr(self, "_on_stop") and self._on_stop:
+            import threading
+            threading.Thread(target=self._on_stop, daemon=True).start()
+
     # ── Colour utilities ──────────────────────────────────────────────────────
+
 
     @staticmethod
     def _lighten(hex_colour: str, amount: float) -> str:

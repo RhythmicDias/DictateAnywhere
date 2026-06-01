@@ -159,10 +159,7 @@ class DictateAnywhere:
         self._previous_text = ""
         self._active_stream_engine = None
         
-        # Real-time chunking state
-        import queue
-        self._chunk_queue = queue.Queue(maxsize=1)
-        threading.Thread(target=self._chunk_worker, daemon=True).start()
+
 
         # ── Tkinter root (hidden — we only need the event loop) ───────────────
         self._root = tk.Tk()
@@ -317,20 +314,6 @@ class DictateAnywhere:
         enable_limit = self._cfg.get("enable_max_record_limit", True)
         max_sec = self._cfg.get("max_record_seconds", 30) if enable_limit else 3600
 
-        enable_rt = self._cfg.get("enable_realtime", True)
-        rt_freq = self._cfg.get("realtime_frequency_ms", 800)
-        
-        # Start engine-level streaming if supported (e.g. Sarvam WebSocket)
-        self._active_stream_engine = None
-        mode = self._cfg.get("engine_mode", "hybrid")
-        if mode == "sarvam" and self._cfg.get("enable_sarvam_websocket", True):
-            self._active_stream_engine = self._sarvam_engine
-            self._sarvam_engine.start_stream(
-                on_text=lambda text: self._root.after(0, self._preview.show_tentative_text, text),
-                language=self._cfg.get("language", "auto")
-            )
-            logger.info("Sarvam WebSocket stream started")
-        
         self._timed_capture = TimedCapture(
             vad=self._vad,
             on_complete=self._on_audio_ready,
@@ -338,8 +321,7 @@ class DictateAnywhere:
             silence_timeout_ms=self._cfg.get("silence_timeout_ms", 1500),
             max_seconds=max_sec,
             on_level=lambda rms: self._root.after(0, self._preview.set_level, rms),
-            on_chunk=self._on_audio_chunk if enable_rt else None,
-            chunk_interval_ms=rt_freq,
+            on_chunk=None,
         )
         self._timed_capture.start()
 
@@ -386,73 +368,27 @@ class DictateAnywhere:
             daemon=True,
         ).start()
 
-    def _on_audio_chunk(self, chunk_bytes: bytes) -> None:
-        """Called periodically by TimedCapture with the accumulating audio buffer."""
-        # 1. Send to engine-level stream if active
-        if hasattr(self, '_active_stream_engine') and self._active_stream_engine:
-            self._active_stream_engine.send_chunk(chunk_bytes)
-            return # Skip local fallback worker if we have a primary stream
 
-        # 2. Otherwise fall back to local worker queue
-        import queue
-        try:
-            # Overwrite any pending chunk so the worker gets the freshest one
-            try:
-                self._chunk_queue.get_nowait()
-            except queue.Empty:
-                pass
-            self._chunk_queue.put_nowait(chunk_bytes)
-        except queue.Full:
-            pass
-
-    def _chunk_worker(self) -> None:
-        """Background thread that continuously processes tentative chunks."""
-        while True:
-            chunk_bytes = self._chunk_queue.get()
-            # If we are no longer dictating, skip (the final transcription handles it)
-            with self._state_lock:
-                if not self._dictating:
-                    continue
-                    
-            if not _audio_has_speech_energy(chunk_bytes):
-                continue
-                
-            try:
-                # Use the selected engine (local, cloud, or sarvam) for chunks
-                res = self._run_hybrid_transcription(chunk_bytes)
-                if res.success and res.text.strip():
-                    text = clean_whisper_artifacts(res.text)
-                    text = process_text(
-                        text,
-                        previous_text=self._previous_text,
-                        apply_punctuation=self._cfg.get("spoken_punctuation", True),
-                        apply_capitalise=self._cfg.get("auto_capitalise", True),
-                    ).strip()
-                    
-                    if text:
-                        # Display on UI
-                        self._root.after(0, self._preview.show_tentative_text, text)
-            except Exception as e:
-                logger.debug("Chunk transcription failed: %s", e)
 
     def _transcribe_and_inject(self, audio_bytes: bytes) -> None:
         """Transcribe audio and inject result at cursor. Runs on a worker thread."""
+        had_error = False
         try:
             # Gate: skip Whisper entirely if the audio is too quiet to be speech.
             # This prevents Whisper hallucinations ("You", "Thank you", etc.)
             # on near-silence recordings from background noise.
             if not _audio_has_speech_energy(audio_bytes):
                 logger.info("Audio energy below threshold — skipping transcription")
-                self._set_state("idle")
                 return
 
             res = self._run_hybrid_transcription(audio_bytes)
             
             if not res.success:
-                error_msg = f"❌ {res.engine_name.title()} Error: {res.error}"
-                logger.error(error_msg)
-                self._root.after(0, self._preview.show_text, error_msg)
-                self._set_state("idle")
+                error_msg = f"Error: {res.error}"
+                logger.error("❌ %s %s", res.engine_name.title(), error_msg)
+                self._root.after(0, self._preview.show_status, error_msg)
+                self._set_state("error")
+                had_error = True
                 return
 
             if res.text and res.text.strip():
@@ -464,7 +400,43 @@ class DictateAnywhere:
                     apply_capitalise=self._cfg.get("auto_capitalise", True),
                 )
                 text = self._corr.apply(text)
-                
+
+                # Check for voice launch commands
+                cleaned_phrase = text.strip().lower()
+                for char in [".", ",", "!", "?", "\"", "'"]:
+                    if cleaned_phrase.endswith(char):
+                        cleaned_phrase = cleaned_phrase[:-1]
+                cleaned_phrase = cleaned_phrase.strip()
+
+                commands = self._cfg.get("app_launcher_commands", {})
+                matched_path = None
+                for cmd, path in commands.items():
+                    normalized_cmd = cmd.strip().lower()
+                    for char in [".", ",", "!", "?", "\"", "'"]:
+                        if normalized_cmd.endswith(char):
+                            normalized_cmd = normalized_cmd[:-1]
+                    normalized_cmd = normalized_cmd.strip()
+
+                    if cleaned_phrase == normalized_cmd:
+                        matched_path = path
+                        break
+
+                if matched_path:
+                    logger.info("Voice command matched: %r -> launching %s", text, matched_path)
+                    self._root.after(0, self._preview.show_status, f"Launching: {os.path.basename(matched_path)}")
+                    try:
+                        if sys.platform == "win32":
+                            os.startfile(matched_path)
+                        else:
+                            import subprocess
+                            subprocess.Popen([matched_path])
+                    except Exception as e:
+                        logger.error("Failed to launch app %s: %s", matched_path, e)
+                        self._root.after(0, self._preview.show_status, "Launch failed")
+                        self._set_state("error")
+                        had_error = True
+                    return  # Bypass text injection
+
                 # Polish text using LLM if enabled
                 if self._cfg.get("enable_polish", False):
                     provider = self._cfg.get("polish_provider", "none")
@@ -493,6 +465,7 @@ class DictateAnywhere:
                 # Strip text completely to remove any leading spaces from Whisper
                 text = text.strip()
                 if text:
+                    self._set_state("injecting")
                     logger.info("Injecting: %r", text[:80])
                     # Inject with exactly ONE trailing space to separate continuous chunks
                     self._injector.inject(text + " ")
@@ -500,11 +473,12 @@ class DictateAnywhere:
                     # Update our rolling context so the next chunk capitalizes correctly
                     self._previous_text = text + " "
                     
-                    # Update overlay and history on main thread
-                    self._root.after(0, self._preview.show_text, text)
+                    # Update history on main thread
                     self._root.after(0, self._history.add_entry, text)
         except Exception as exc:
             logger.exception("Transcription/injection error: %s", exc)
+            self._set_state("error")
+            had_error = True
         finally:
             # In continuous mode, restart listening immediately after each
             # utterance so the user never has to press the hotkey again.
@@ -512,7 +486,7 @@ class DictateAnywhere:
             if self._continuous_session:
                 logger.info("Continuous session — restarting dictation")
                 self._root.after(0, self._start_dictation)
-            else:
+            elif not had_error:
                 self._set_state("idle")
 
     def _run_hybrid_transcription(self, audio_bytes: bytes) -> TranscriptionResult:
@@ -731,6 +705,9 @@ def main() -> None:
         try:
             import ctypes
             ctypes.windll.kernel32.SetConsoleTitleW("DictateAnywhere")
+            # Set AppUserModelID so taskbar groups under the custom window icon instead of python.exe
+            myappid = "RhythmicDias.DictateAnywhere.App.1.0"
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
         except Exception:
             pass
 

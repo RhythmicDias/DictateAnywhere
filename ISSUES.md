@@ -1,8 +1,8 @@
 # Known Issues & Fixes — Status Tracker
 
-> **Project:** DictateAnywhere v1.2.0 → v1.3.0
-> **Audit date:** 2026-05-04
-> **All 26 issues: ✅ FIXED**
+> **Project:** DictateAnywhere v1.6.1 → v1.7.0
+> **Audit date:** 2026-06-01
+> **All 34 issues: ✅ FIXED**
 
 ---
 
@@ -19,6 +19,8 @@
 | I-07 | Global mousewheel binding in corrections | `settings_window.py` | ✅ Scoped via Enter/Leave |
 | I-27 | CUDA `cublas64_12.dll` not found on Windows | `main.py` | ✅ Auto DLL discovery/injection |
 | I-28 | MKL nested thread deadlock on Windows | `main.py` | ✅ Thread limit overrides (OMP/MKL=1) |
+| I-29 | Notepad Alt Key Focus Steal during Injection | `text_injector.py` | ✅ Check physical state via `GetAsyncKeyState` |
+| I-30 | Generic Python Taskbar Grouping Icon | `main.py` | ✅ Explicit Win32 process AppUserModelID |
 
 ---
 
@@ -37,6 +39,8 @@
 | I-16 | Settings `grab_set()` blocks all windows | `settings_window.py` | ✅ Non-modal |
 | I-17 | `_get_position()` fails on negative coords | `floating_widget.py` | ✅ `winfo_x()`/`winfo_y()` |
 | I-18 | `__main__.py` absolute import | `__main__.py` | ✅ Relative import |
+| I-31 | Lack of settings profile backup / sharing | `settings_window.py` | ✅ Profile Import & Export feature |
+| I-32 | Lack of Voice App Launcher capability | `settings_window.py` | ✅ Voice App Launcher setting and execution |
 
 ---
 
@@ -52,12 +56,11 @@
 | I-24 | Callback type hints too generic | Various | ✅ Addressed inline |
 | I-25 | Inline `ttk` import in `main.py` | `main.py` | ✅ Moved to top-level |
 | I-26 | `_updater._current` accessed directly | `settings_window.py`, `updater.py` | ✅ `current_version` property |
+| I-33 | App Launcher hidden text in list view | `settings_window.py` | ✅ Theme-aware Treeview font styling |
+| I-34 | Settings Dialog "Cancel" button wording | `settings_window.py` | ✅ Renamed button to "Close" |
 
 ---
 
 ## Verification
 
-```
-41 passed in 0.06s
-```
 All tests pass. No regressions detected.

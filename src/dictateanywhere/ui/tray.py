@@ -8,6 +8,7 @@ with dictation controls, widget toggle, settings, and quit.
 from __future__ import annotations
 
 import logging
+import os
 import threading
 from typing import Callable, Optional
 
@@ -23,30 +24,63 @@ _COLOUR_BG       = "#FFFFFF"   # white background
 _ICON_SIZE       = (64, 64)
 
 
+_BASE_ICON: Optional[Image.Image] = None
+
+
+def _get_base_icon() -> Image.Image:
+    global _BASE_ICON
+    if _BASE_ICON is None:
+        try:
+            # Locate assets/icon.png relative to this file
+            base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+            icon_path = os.path.join(base_dir, "assets", "icon.png")
+            if os.path.exists(icon_path):
+                img = Image.open(icon_path).convert("RGBA")
+                _BASE_ICON = img.resize(_ICON_SIZE, Image.Resampling.LANCZOS)
+            else:
+                logger.warning("Tray base icon not found: %s", icon_path)
+        except Exception as e:
+            logger.error("Failed to load tray base icon: %s", e)
+    
+    if _BASE_ICON is not None:
+        return _BASE_ICON.copy()
+    return Image.new("RGBA", _ICON_SIZE, (0, 0, 0, 0))
+
+
 def _make_icon(state: str = "idle") -> Image.Image:
-    """Generate a simple round mic icon for the system tray."""
+    """Generate a system tray icon by overlaying a state status dot on the official app icon."""
     colour_map = {
-        "idle":    _COLOUR_IDLE,
-        "active":  _COLOUR_ACTIVE,
-        "loading": _COLOUR_LOADING,
-        "error":   "#95A5A6",
+        "idle":    "#00E5FF",   # neon cyan/ice blue matching the glowing microphone
+        "active":  "#FF1744",   # vibrant neon red (recording)
+        "loading": "#FFEA00",   # neon yellow/amber (model loading)
+        "error":   "#9E9E9E",   # grey (error)
     }
-    colour = colour_map.get(state, _COLOUR_IDLE)
+    colour = colour_map.get(state, "#00E5FF")
 
-    img = Image.new("RGBA", _ICON_SIZE, (0, 0, 0, 0))
+    # Load base icon
+    img = _get_base_icon()
+    
+    # If the base icon couldn't be loaded, draw the legacy microphone icon as fallback
+    if _BASE_ICON is None:
+        draw = ImageDraw.Draw(img)
+        # Outer circle
+        draw.ellipse([2, 2, 61, 61], fill=colour, outline=None)
+        # Microphone body (white rectangle)
+        draw.rounded_rectangle([22, 10, 42, 38], radius=10, fill="#FFFFFF")
+        # Microphone stand (white arc shape simplified as rect + line)
+        draw.arc([16, 28, 48, 50], start=0, end=180, fill="#FFFFFF", width=3)
+        draw.line([32, 50, 32, 56], fill="#FFFFFF", width=3)
+        draw.line([24, 56, 40, 56], fill="#FFFFFF", width=3)
+        return img
+
+    # Draw status indicator dot in the bottom-right corner of the premium icon
     draw = ImageDraw.Draw(img)
-
-    # Outer circle
-    draw.ellipse([2, 2, 61, 61], fill=colour, outline=None)
-
-    # Microphone body (white rectangle)
-    draw.rounded_rectangle([22, 10, 42, 38], radius=10, fill="#FFFFFF")
-
-    # Microphone stand (white arc shape simplified as rect + line)
-    draw.arc([16, 28, 48, 50], start=0, end=180, fill="#FFFFFF", width=3)
-    draw.line([32, 50, 32, 56], fill="#FFFFFF", width=3)
-    draw.line([24, 56, 40, 56], fill="#FFFFFF", width=3)
-
+    dot_box = [42, 42, 56, 56]
+    
+    # Draw a dark border/glow around the status dot for visibility on any background
+    draw.ellipse([40, 40, 58, 58], fill="#121212")
+    draw.ellipse(dot_box, fill=colour)
+    
     return img
 
 
@@ -87,7 +121,13 @@ class TrayIcon:
 
     def start(self) -> None:
         """Launch the tray icon in a daemon thread."""
+        import sys
+        if sys.platform == "darwin":
+            logger.info("Tray icon disabled on macOS due to OS-level main thread restrictions. Floating widget right-click menu is enabled.")
+            return
+
         import pystray
+
 
         menu = pystray.Menu(
             pystray.MenuItem("DictateAnywhere", None, enabled=False),
