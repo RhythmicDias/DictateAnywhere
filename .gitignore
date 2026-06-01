@@ -62,6 +62,7 @@ history.db
 *.key
 *.pem
 secrets.txt
+GITSKILL.md
 
 # ─── Downloaded Whisper models (can be large) ─────────────────────────────────
 models/
