@@ -1,8 +1,22 @@
-# DictateAnywhere
+<div align="center">
 
-**Hybrid voice dictation for Windows** — types anywhere your cursor is using offline faster-whisper and Azure/Sarvam cloud backends.
+  <img src="assets/icon.png" alt="DictateAnywhere logo" width="120" />
 
-Powered by [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (offline, CPU-efficient) with optional [Azure Speech](https://azure.microsoft.com/en-us/products/ai-services/speech-to-text) or [Sarvam AI](https://www.sarvam.ai/) cloud fallback for maximum accuracy and multi-language support.
+  # DictateAnywhere
+
+  Hybrid voice dictation for Windows — types in any active text field using local offline faster-whisper or optional Azure/Sarvam AI cloud backends.
+
+  ![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)
+  ![Platform](https://img.shields.io/badge/platform-Windows-blue?style=flat-square)
+  ![Release](https://img.shields.io/github/v/release/RhythmicDias/DictateAnywhere?label=release&style=flat-square)
+  ![GitHub stars](https://img.shields.io/github/stars/RhythmicDias/DictateAnywhere?style=flat-square)
+  ![GitHub downloads](https://img.shields.io/github/downloads/RhythmicDias/DictateAnywhere/total?style=flat-square)
+
+  [📥 Download Releases](https://github.com/RhythmicDias/DictateAnywhere/releases) • [📖 Documentation](README.md)
+
+  [![Download Now](https://img.shields.io/badge/⬇_DOWNLOAD_NOW-LATEST_VERSION-blue?style=for-the-badge&logo=windows)](https://github.com/RhythmicDias/DictateAnywhere/releases/latest)
+
+</div>
 
 ---
 
