@@ -15,18 +15,18 @@ echo [DictateAnywhere] Detecting Python version ...
 set "PYTHON_CMD="
 
 REM Try Python Launcher (py -3) first
-py -3 -c "import sys; exit(0 if sys.version_info >= (3, 11) else 1)" >nul 2>&1
+py -3 -c "import sys; exit(0 if (3, 11) <= sys.version_info < (3, 14) else 1)" >nul 2>&1
 if %errorlevel% equ 0 set "PYTHON_CMD=py -3"
 
 if defined PYTHON_CMD goto python_detected
 
 REM Try raw python command
-python -c "import sys; exit(0 if sys.version_info >= (3, 11) else 1)" >nul 2>&1
+python -c "import sys; exit(0 if (3, 11) <= sys.version_info < (3, 14) else 1)" >nul 2>&1
 if %errorlevel% equ 0 set "PYTHON_CMD=python"
 
 if defined PYTHON_CMD goto python_detected
 
-echo ERROR: Python 3.11 or newer (64-bit) was not found on PATH.
+echo ERROR: Python 3.11, 3.12, or 3.13 (64-bit) was not found on PATH.
 echo Please install Python 3.11, 3.12, or 3.13 from https://www.python.org/downloads/
 echo Make sure to check "Add python.exe to PATH" during installation.
 pause

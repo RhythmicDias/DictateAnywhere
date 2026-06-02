@@ -21,6 +21,16 @@ else
     exit 1
 fi
 
+# Verify Python version (requires 3.11, 3.12, or 3.13)
+if ! $PYTHON_CMD -c "import sys; exit(0 if (3, 11) <= sys.version_info < (3, 14) else 1)" >/dev/null 2>&1; then
+    echo "ERROR: Python 3.11, 3.12, or 3.13 is required."
+    echo "Current version is:"
+    $PYTHON_CMD --version
+    echo "Please install Python 3.11, 3.12, or 3.13 via Homebrew ('brew install python') or from https://www.python.org/downloads/"
+    exit 1
+fi
+
+echo "[DictateAnywhere] Using Python:"
 $PYTHON_CMD --version
 
 echo ""
@@ -28,7 +38,6 @@ echo "[DictateAnywhere] Creating virtual environment in $VENV_DIR..."
 $PYTHON_CMD -m venv "$VENV_DIR"
 if [ $? -ne 0 ]; then
     echo "ERROR: Failed to create virtual environment."
-    echo "Make sure Python 3.11 or newer is installed."
     exit 1
 fi
 
