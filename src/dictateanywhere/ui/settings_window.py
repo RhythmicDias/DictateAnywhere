@@ -120,30 +120,6 @@ class SettingsWindow:
 
         _set_window_icon(self._win)
 
-        # Logo header
-        header = ttk.Frame(self._win)
-        header.pack(fill=tk.X, padx=_PAD, pady=(12, 4))
-        
-        self._logo_img = None
-        try:
-            base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-            logo_path = os.path.join(base_dir, "assets", "logo.png")
-            if os.path.exists(logo_path):
-                from PIL import Image, ImageTk
-                img = Image.open(logo_path)
-                # Resize keeping aspect ratio
-                h = 42
-                w = int(img.width * (h / img.height))
-                img = img.resize((w, h), Image.Resampling.LANCZOS)
-                self._logo_img = ImageTk.PhotoImage(img)
-                
-                logo_lbl = ttk.Label(header, image=self._logo_img)
-                logo_lbl.pack(anchor=tk.CENTER)
-            else:
-                # Fallback: title text
-                ttk.Label(header, text="DictateAnywhere", font=("Segoe UI", 16, "bold")).pack(pady=5)
-        except Exception as e:
-            logger.debug("Failed to load logo in settings: %s", e)
 
         nb = ttk.Notebook(self._win)
         nb.pack(fill=tk.BOTH, expand=True, padx=_PAD, pady=_PAD)
@@ -174,7 +150,7 @@ class SettingsWindow:
         ttk.Button(bar, text="Export Settings", command=self._export_settings).pack(side=tk.RIGHT, padx=4)
         ttk.Button(bar, text="Import Settings", command=self._import_settings).pack(side=tk.RIGHT, padx=4)
 
-        self._win.geometry("540x580")
+        self._win.geometry("540x530")
         self._centre_window()
 
     # ── Tabs ──────────────────────────────────────────────────────────────────
