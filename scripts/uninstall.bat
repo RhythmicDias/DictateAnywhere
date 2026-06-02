@@ -36,7 +36,7 @@ echo.
 echo ── Step 2/5: Removing Windows startup registry entry ────────────────────────
 reg delete "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /v "DictateAnywhere" /f >nul 2>&1
 if errorlevel 1 (
-    echo   Not found (was not set to start with Windows — OK).
+    echo   Not found ^(was not set to start with Windows — OK^).
 ) else (
     echo   Removed startup entry.
 )
@@ -47,7 +47,7 @@ set VENV_PYTHON=.venv\Scripts\python.exe
 if exist "%VENV_PYTHON%" (
     "%VENV_PYTHON%" -c "import keyring; keyring.delete_password('DictateAnywhere', 'azure_speech_api_key')" >nul 2>&1
     if errorlevel 1 (
-        echo   No Azure key found (already removed or never set — OK).
+        echo   No Azure key found ^(already removed or never set — OK^).
     ) else (
         echo   Azure API key removed from Windows Credential Manager.
     )
