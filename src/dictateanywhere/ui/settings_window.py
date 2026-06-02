@@ -113,7 +113,8 @@ class SettingsWindow:
     def _build(self) -> None:
         self._win = tk.Toplevel(self._root)
         self._win.title("DictateAnywhere — Settings")
-        self._win.resizable(False, False)
+        self._win.resizable(False, True)
+        self._win.minsize(540, 500)
         # Non-modal — user can still interact with floating widget and preview
         self._win.protocol("WM_DELETE_WINDOW", self.close)
 
@@ -173,7 +174,7 @@ class SettingsWindow:
         ttk.Button(bar, text="Export Settings", command=self._export_settings).pack(side=tk.RIGHT, padx=4)
         ttk.Button(bar, text="Import Settings", command=self._import_settings).pack(side=tk.RIGHT, padx=4)
 
-        self._win.update_idletasks()
+        self._win.geometry("540x580")
         self._centre_window()
 
     # ── Tabs ──────────────────────────────────────────────────────────────────
@@ -299,7 +300,7 @@ class SettingsWindow:
 
     def _build_tab_cloud_stt(self, nb: ttk.Notebook) -> None:
         """Consolidated tab for all Cloud STT and AI Providers (Azure, Sarvam, Gemini)."""
-        f = self._tab(nb, "Cloud STT")
+        f = self._tab(nb, "Cloud STT", scrollable=True)
         
         # ── Azure Speech ──────────────────────────────────────────────────────
         az_frame = ttk.LabelFrame(f, text=" Azure Speech ", padding=_PAD)
@@ -398,7 +399,7 @@ class SettingsWindow:
 
 
     def _build_tab_advanced(self, nb: ttk.Notebook) -> None:
-        f = self._tab(nb, "Advanced")
+        f = self._tab(nb, "Advanced", scrollable=True)
 
         ttk.Label(f, text="General", font=("", 9, "bold")).pack(anchor=tk.W, padx=_PAD, pady=(4, 2))
         self._check(f, "Spoken punctuation (\"period\" → \".\")", "spoken_punctuation")
@@ -539,7 +540,7 @@ class SettingsWindow:
                   foreground="gray").pack(anchor=tk.W, padx=_PAD)
 
     def _build_tab_polish(self, nb: ttk.Notebook) -> None:
-        f = self._tab(nb, "Polish")
+        f = self._tab(nb, "Polish", scrollable=True)
         
         ttk.Label(f, text="Text Polish Settings", font=("", 10, "bold")).pack(
             anchor=tk.W, padx=_PAD, pady=(_PAD, 2))
@@ -937,10 +938,45 @@ class SettingsWindow:
 
     # ── Widget helpers ────────────────────────────────────────────────────────
 
-    def _tab(self, nb: ttk.Notebook, label: str) -> ttk.Frame:
-        f = ttk.Frame(nb, padding=_PAD)
-        nb.add(f, text=f"  {label}  ")
-        return f
+    def _tab(self, nb: ttk.Notebook, label: str, scrollable: bool = False) -> ttk.Frame:
+        if scrollable:
+            tab_frame = ttk.Frame(nb)
+            nb.add(tab_frame, text=f"  {label}  ")
+            
+            canvas = tk.Canvas(tab_frame, borderwidth=0, highlightthickness=0)
+            scrollbar = ttk.Scrollbar(tab_frame, orient="vertical", command=canvas.yview)
+            canvas.configure(yscrollcommand=scrollbar.set)
+            
+            scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+            canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+            
+            content_frame = ttk.Frame(canvas, padding=_PAD)
+            canvas_win = canvas.create_window((0, 0), window=content_frame, anchor="nw")
+            
+            content_frame.bind(
+                "<Configure>",
+                lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+            )
+            canvas.bind(
+                "<Configure>",
+                lambda e: canvas.itemconfig(canvas_win, width=e.width)
+            )
+            
+            def _on_wheel(event):
+                canvas.yview_scroll(-1 * (event.delta // 120), "units")
+            def _bind_wheel(event):
+                canvas.bind_all("<MouseWheel>", _on_wheel)
+            def _unbind_wheel(event):
+                canvas.unbind_all("<MouseWheel>")
+            
+            canvas.bind("<Enter>", _bind_wheel)
+            canvas.bind("<Leave>", _unbind_wheel)
+            
+            return content_frame
+        else:
+            f = ttk.Frame(nb, padding=_PAD)
+            nb.add(f, text=f"  {label}  ")
+            return f
 
     def _combo(self, parent, label: str, key: str,
                values: list, hint: str = "") -> None:
@@ -1317,13 +1353,17 @@ class SettingsWindow:
             self._status_var.set("Sarvam key cleared.")
 
     def _centre_window(self) -> None:
-        w = self._win.winfo_reqwidth()
-        h = self._win.winfo_reqheight()
+        self._win.update_idletasks()
+        w = self._win.winfo_width()
+        h = self._win.winfo_height()
+        if w <= 1 or h <= 1:
+            w = self._win.winfo_reqwidth()
+            h = self._win.winfo_reqheight()
         sw = self._win.winfo_screenwidth()
         sh = self._win.winfo_screenheight()
         x = (sw - w) // 2
         y = (sh - h) // 2
-        self._win.geometry(f"+{x}+{y}")
+        self._win.geometry(f"{w}x{h}+{x}+{y}")
 
 
 def _row(parent, label: str) -> ttk.Label:
