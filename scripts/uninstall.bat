@@ -13,6 +13,7 @@ REM   6. Optionally: the application folder itself
 REM ─────────────────────────────────────────────────────────────────────────────
 
 setlocal EnableDelayedExpansion
+cd /d "%~dp0.."
 
 echo.
 echo  ============================================================
@@ -101,7 +102,7 @@ if /I "!REMOVE_DIR!"=="y" (
     REM We cannot delete the folder we are currently running from, so we
     REM use a scheduled self-delete via cmd /C after a brief delay.
     set "CURRENT_DIR=%~dp0.."
-    start "" /B cmd /C "timeout /T 2 /NOBREAK >nul & rmdir /S /Q ""%~dp0.."""
+    start "" /B cmd /C "cd /d %SystemRoot% & timeout /T 2 /NOBREAK >nul & rmdir /S /Q ""%~dp0.."""
     echo   The application folder will be removed in a few seconds.
     echo   (If it is not removed automatically, delete it manually.)
 ) else (

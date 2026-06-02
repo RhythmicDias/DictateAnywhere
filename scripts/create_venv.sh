@@ -4,6 +4,8 @@
 # Run this once before install.sh
 # ─────────────────────────────────────────────────────────────────────────────
 
+cd "$(dirname "$0")/.." || exit 1
+
 VENV_DIR=".venv"
 
 echo "[DictateAnywhere] Checking Python version..."

@@ -10,8 +10,8 @@
 #   5. Optionally: the application folder itself
 # ─────────────────────────────────────────────────────────────────────────────
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-APP_DIR="$(dirname "$SCRIPT_DIR")"
+cd "$(dirname "$0")/.." || exit 1
+APP_DIR="$(pwd)"
 
 echo ""
 echo "============================================================"

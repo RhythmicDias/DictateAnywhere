@@ -4,6 +4,8 @@
 # Run scripts/create_venv.sh first if .venv does not exist.
 # ─────────────────────────────────────────────────────────────────────────────
 
+cd "$(dirname "$0")/.." || exit 1
+
 VENV_DIR=".venv"
 PYTHON="$VENV_DIR/bin/python"
 
