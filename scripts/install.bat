@@ -27,7 +27,7 @@ if errorlevel 1 (
 
 echo.
 echo [DictateAnywhere] Step 2/2 — Installing dependencies (prefer pre-built wheels) ...
-"%PYTHON%" -m pip install --prefer-binary -r requirements.txt
+"%PYTHON%" -m pip install --prefer-binary -e .
 
 if errorlevel 1 (
     echo.
@@ -37,7 +37,7 @@ if errorlevel 1 (
     echo   1. Make sure you are running Python 3.11, 3.12, or 3.13 (64-bit^)
     echo      Check with: python --version
     echo   2. Try running this command manually to see the full error:
-    echo      %PYTHON% -m pip install --prefer-binary -r requirements.txt
+    echo      %PYTHON% -m pip install --prefer-binary -e .
     pause
     exit /b 1
 )
