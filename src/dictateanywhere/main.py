@@ -22,6 +22,13 @@ os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["MKL_NUM_THREADS"] = "1"
 
+# Disable tqdm monitor thread globally to prevent crashes on shutdown or thread cleanup in Python 3.13+
+try:
+    import tqdm
+    tqdm.tqdm.monitor_interval = 0
+except ImportError:
+    pass
+
 def _setup_nvidia_dlls():
     """Add NVIDIA library paths from site-packages to DLL search path on Windows."""
     if sys.platform != "win32":
@@ -272,6 +279,9 @@ class DictateAnywhere:
             on_update_available=lambda latest, url:
                 self._root.after(0, self._show_update_dialog, latest, url)
         )
+
+        # Start the Qt event pump
+        self._pump_qt_events()
 
         logger.info(
             "DictateAnywhere ready. Hotkey: %s | Engine: %s",
@@ -602,6 +612,10 @@ class DictateAnywhere:
             self._local_engine.set_device(cfg.local_device)
             threading.Thread(target=self._load_local_engine, daemon=True).start()
 
+        # Update live languages
+        self._local_engine.set_language(cfg.language)
+        self._cloud_engine.set_language(cfg.language)
+
         # Azure key might have changed
         self._cloud_engine.update_credentials(
             self._sec.get_azure_key(),
@@ -694,6 +708,33 @@ class DictateAnywhere:
         """Schedule *fn* to run on the tkinter main thread."""
         try:
             self._root.after(delay_ms, fn)
+        except RuntimeError:
+            pass
+
+    def _pump_qt_events(self) -> None:
+        """Process pending Qt events on the Tkinter event loop thread."""
+        if getattr(self, "_pumping_qt", False):
+            try:
+                self._root.after(15, self._pump_qt_events)
+            except RuntimeError:
+                pass
+            return
+
+        self._pumping_qt = True
+        try:
+            from PySide6.QtWidgets import QApplication
+            app = QApplication.instance()
+            if app:
+                app.processEvents()
+        except ImportError:
+            pass
+        except Exception:
+            pass
+        finally:
+            self._pumping_qt = False
+
+        try:
+            self._root.after(15, self._pump_qt_events)
         except RuntimeError:
             pass
 

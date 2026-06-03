@@ -43,6 +43,13 @@ if errorlevel 1 (
 )
 
 echo.
+echo [DictateAnywhere] Step 3/3 — Downloading font assets ...
+"%PYTHON%" scripts\download_fonts.py
+if errorlevel 1 (
+    echo WARNING: Font download failed — system fallbacks will be used.
+)
+
+echo.
 echo =============================================================================
 echo  Installation complete!
 echo.
