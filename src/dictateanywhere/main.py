@@ -280,9 +280,6 @@ class DictateAnywhere:
                 self._root.after(0, self._show_update_dialog, latest, url)
         )
 
-        # Start the Qt event pump
-        self._pump_qt_events()
-
         logger.info(
             "DictateAnywhere ready. Hotkey: %s | Engine: %s",
             self._cfg.get("hotkey"),
@@ -711,32 +708,7 @@ class DictateAnywhere:
         except RuntimeError:
             pass
 
-    def _pump_qt_events(self) -> None:
-        """Process pending Qt events on the Tkinter event loop thread."""
-        if getattr(self, "_pumping_qt", False):
-            try:
-                self._root.after(15, self._pump_qt_events)
-            except RuntimeError:
-                pass
-            return
 
-        self._pumping_qt = True
-        try:
-            from PySide6.QtWidgets import QApplication
-            app = QApplication.instance()
-            if app:
-                app.processEvents()
-        except ImportError:
-            pass
-        except Exception:
-            pass
-        finally:
-            self._pumping_qt = False
-
-        try:
-            self._root.after(15, self._pump_qt_events)
-        except RuntimeError:
-            pass
 
 
 def main() -> None:

@@ -245,17 +245,26 @@ class HotkeyManager:
         on_start: Optional[Callable] = None,
         on_stop: Optional[Callable] = None,
     ) -> bool:
-        """Apply new settings by unregistering and re-registering."""
+        """Apply new settings by unregistering and re-registering only if changed."""
+        changed = False
+        if hotkey is not None and hotkey.strip().lower() != self._hotkey.strip().lower():
+            self._hotkey = hotkey
+            changed = True
+        if mode is not None and mode != self._mode:
+            self._mode = mode
+            changed = True
+        if on_start is not None and on_start != self._on_start:
+            self._on_start = on_start
+            changed = True
+        if on_stop is not None and on_stop != self._on_stop:
+            self._on_stop = on_stop
+            changed = True
+
+        if not changed:
+            return True
+
         was_registered = self._registered
         self.unregister()
-        if hotkey:
-            self._hotkey = hotkey
-        if mode:
-            self._mode = mode
-        if on_start is not None:
-            self._on_start = on_start
-        if on_stop is not None:
-            self._on_stop = on_stop
         if was_registered:
             return self.register()
         return True

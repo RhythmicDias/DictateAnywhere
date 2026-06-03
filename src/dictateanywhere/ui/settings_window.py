@@ -138,6 +138,55 @@ class SettingsWindow:
         self._win = None
 
     def open(self) -> None:
+        if not os.environ.get("DICTATE_ANYWHERE_SETTINGS_SUBPROCESS"):
+            # Launch as a separate process to prevent GIL/GUI framework conflicts
+            import subprocess
+            
+            if hasattr(self, "_proc") and self._proc and self._proc.poll() is None:
+                # Subprocess is already running, don't spawn another
+                return
+
+            env = os.environ.copy()
+            env["DICTATE_ANYWHERE_SETTINGS_SUBPROCESS"] = "1"
+            
+            # Ensure the package is importable in the subprocess
+            src_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            if "PYTHONPATH" in env:
+                env["PYTHONPATH"] = src_dir + os.pathsep + env["PYTHONPATH"]
+            else:
+                env["PYTHONPATH"] = src_dir
+
+            logger.info("Spawning settings window in a separate process.")
+            self._proc = subprocess.Popen(
+                [sys.executable, "-m", "dictateanywhere.ui.settings_window"],
+                env=env,
+            )
+
+            def _check_exit():
+                if self._proc is None:
+                    return
+                if self._proc.poll() is not None:
+                    logger.info("Settings subprocess finished. Reloading configuration.")
+                    self._cfg.load()
+                    if self._corrections:
+                        self._corrections.load()
+                    if self._on_save:
+                        self._on_save()
+                    self._proc = None
+                else:
+                    if self._root:
+                        try:
+                            self._root.after(100, _check_exit)
+                        except RuntimeError:
+                            pass
+
+            if self._root:
+                try:
+                    self._root.after(100, _check_exit)
+                except RuntimeError:
+                    pass
+            return
+
         if not PYSIDE6_AVAILABLE:
             logger.error("PySide6 is not installed. Run scripts\\install.bat again.")
             return
@@ -1498,3 +1547,39 @@ class _MicTestDialog(QDialog):
             except Exception:
                 pass
         super().closeEvent(event)
+
+
+if __name__ == "__main__":
+    os.environ["DICTATE_ANYWHERE_SETTINGS_SUBPROCESS"] = "1"
+    
+    from dictateanywhere.utils.config import ConfigManager
+    from dictateanywhere.utils.secure_storage import SecureStorage
+    from dictateanywhere.core.corrections import CorrectionsManager
+    from dictateanywhere.core.updater import UpdateChecker
+    from dictateanywhere.core.hotkey_manager import validate_hotkey
+    from dictateanywhere import __version__
+    
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+    )
+
+    cfg = ConfigManager()
+    sec = SecureStorage()
+    corr = CorrectionsManager(cfg.config_dir() / "corrections.json")
+    updater = UpdateChecker(cfg, current_version=__version__)
+
+    app_controller = SettingsWindow(
+        root=None,
+        config_manager=cfg,
+        secure_storage=sec,
+        on_save=None,
+        hotkey_validator=validate_hotkey,
+        corrections_manager=corr,
+        update_checker=updater,
+    )
+    app_controller.open()
+    
+    app = QApplication.instance()
+    if app:
+        sys.exit(app.exec())
