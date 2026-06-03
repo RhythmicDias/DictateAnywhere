@@ -121,14 +121,26 @@ class SettingsWindow:
         _set_window_icon(self._win)
 
 
-        nb = ttk.Notebook(self._win)
-        nb.pack(fill=tk.BOTH, expand=True, padx=_PAD, pady=_PAD)
-
         self._vars: dict[str, tk.Variable] = {}
         self._azure_key_var = tk.StringVar()
         self._sarvam_key_var = tk.StringVar()
         self._gemini_key_var = tk.StringVar()
         self._status_var = tk.StringVar(value="")
+
+        # Pack footer bar first so it remains fixed at the bottom when window size shrinks
+        bar = ttk.Frame(self._win)
+        bar.pack(side=tk.BOTTOM, fill=tk.X, padx=_PAD, pady=(0, _PAD))
+        ttk.Label(bar, textvariable=self._status_var, foreground="gray").pack(side=tk.LEFT)
+        ttk.Button(bar, text="Close", command=self.close).pack(side=tk.RIGHT, padx=4)
+        ttk.Button(bar, text="Save", command=self._save,
+                   style="Accent.TButton").pack(side=tk.RIGHT)
+        ttk.Button(bar, text="Reset Defaults", command=self._reset).pack(side=tk.RIGHT, padx=4)
+        ttk.Button(bar, text="Export Settings", command=self._export_settings).pack(side=tk.RIGHT, padx=4)
+        ttk.Button(bar, text="Import Settings", command=self._import_settings).pack(side=tk.RIGHT, padx=4)
+
+        # Pack notebook last so it expands into all remaining vertical space above footer
+        nb = ttk.Notebook(self._win)
+        nb.pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=_PAD, pady=_PAD)
 
         self._build_tab_engine(nb)
         self._build_tab_audio(nb)
@@ -140,23 +152,13 @@ class SettingsWindow:
         self._build_tab_polish(nb)
         self._build_tab_app_launcher(nb)
 
-        bar = ttk.Frame(self._win)
-        bar.pack(fill=tk.X, padx=_PAD, pady=(0, _PAD))
-        ttk.Label(bar, textvariable=self._status_var, foreground="gray").pack(side=tk.LEFT)
-        ttk.Button(bar, text="Close", command=self.close).pack(side=tk.RIGHT, padx=4)
-        ttk.Button(bar, text="Save", command=self._save,
-                   style="Accent.TButton").pack(side=tk.RIGHT)
-        ttk.Button(bar, text="Reset Defaults", command=self._reset).pack(side=tk.RIGHT, padx=4)
-        ttk.Button(bar, text="Export Settings", command=self._export_settings).pack(side=tk.RIGHT, padx=4)
-        ttk.Button(bar, text="Import Settings", command=self._import_settings).pack(side=tk.RIGHT, padx=4)
-
         self._win.geometry("540x530")
         self._centre_window()
 
     # ── Tabs ──────────────────────────────────────────────────────────────────
 
     def _build_tab_engine(self, nb: ttk.Notebook) -> None:
-        f = self._tab(nb, "Engine")
+        f = self._tab(nb, "Engine", scrollable=True)
         self._combo(f, "Engine mode", "engine_mode",
                     ["hybrid", "local", "azure", "gemini", "sarvam"],
                     "Hybrid uses local Whisper first; falls back to Azure if it fails.")
@@ -180,7 +182,7 @@ class SettingsWindow:
         self._check(f, "Fall back to local on cloud error", "local_fallback_on_cloud_error")
 
     def _build_tab_audio(self, nb: ttk.Notebook) -> None:
-        f = self._tab(nb, "Audio")
+        f = self._tab(nb, "Audio", scrollable=True)
 
         from ..audio.capture import list_input_devices
         try:
@@ -226,7 +228,7 @@ class SettingsWindow:
                    "Hard cap to prevent runaway recordings.")
 
     def _build_tab_hotkey(self, nb: ttk.Notebook) -> None:
-        f = self._tab(nb, "Hotkey")
+        f = self._tab(nb, "Hotkey", scrollable=True)
         ttk.Label(f, text="Global hotkey", font=("", 9, "bold")).pack(
             anchor=tk.W, padx=_PAD, pady=(_PAD, 2))
         _hint(f, "Works even when DictateAnywhere is in the background.\n"
@@ -263,7 +265,7 @@ class SettingsWindow:
         _hint(f, "1.0 = fully opaque; 0.1 = nearly transparent.")
 
     def _build_tab_widget(self, nb: ttk.Notebook) -> None:
-        f = self._tab(nb, "Floating Button")
+        f = self._tab(nb, "Floating Button", scrollable=True)
         self._check(f, "Show floating mic button", "show_floating_widget")
         self._check(f, "Always on top", "widget_always_on_top")
         self._spin(f, "Button size (px)", "widget_size", 32, 128, 8,
@@ -430,7 +432,7 @@ class SettingsWindow:
                    command=self._refresh_model_list).pack(anchor=tk.W, padx=_PAD, pady=(0, 4))
 
     def _build_tab_corrections(self, nb: ttk.Notebook) -> None:
-        f = self._tab(nb, "Corrections")
+        f = self._tab(nb, "Corrections", scrollable=True)
 
         ttk.Label(f, text="Word Corrections", font=("", 10, "bold")).pack(
             anchor=tk.W, padx=_PAD, pady=(_PAD, 2))
@@ -579,7 +581,7 @@ class SettingsWindow:
         _hint(f, "API Key is managed in the 'Cloud STT' tab.")
 
     def _build_tab_app_launcher(self, nb: ttk.Notebook) -> None:
-        f = self._tab(nb, "App Launcher")
+        f = self._tab(nb, "App Launcher", scrollable=True)
 
         ttk.Label(f, text="App Launcher Commands", font=("", 10, "bold")).pack(
             anchor=tk.W, padx=_PAD, pady=(_PAD, 2))
