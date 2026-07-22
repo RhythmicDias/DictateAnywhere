@@ -96,7 +96,8 @@ class Config:
     log_level: str = "INFO"
     check_updates: bool = True
 
-    # ── Cloud fallback ────────────────────────────────────────────────────────
+    # ── Cloud fallback & STT Provider ─────────────────────────────────────────
+    cloud_provider: str = "azure"          # azure | gemini | sarvam (active cloud provider)
     cloud_fallback_on_error: bool = True  # fall back to cloud if local fails
     cloud_fallback_provider: str = "azure" # azure | gemini | sarvam
     local_fallback_on_cloud_error: bool = True
@@ -130,6 +131,9 @@ class Config:
     ollama_url: str = "http://localhost:11434"
     polish_ollama_model: str = "llama3"
     polish_gemini_model: str = "gemini-flash-lite-latest"
+    polish_openrouter_model: str = ""
+    polish_groq_model: str = ""
+    polish_ollama_timeout: int = 90
 
     # ── Real-time Transcription ───────────────────────────────────────────────
     enable_realtime: bool = False

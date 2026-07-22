@@ -1,0 +1,117 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "DictateAnywhere",
+  "version": "2.0.0",
+  "identifier": "com.rhythmicdias.dictateanywhere",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "DictateAnywhere",
+        "visible": false,
+        "width": 1,
+        "height": 1,
+        "decorations": false,
+        "transparent": true,
+        "skipTaskbar": true,
+        "url": "index.html?window=main"
+      },
+      {
+        "label": "floating-widget",
+        "title": "DictateAnywhere",
+        "visible": false,
+        "width": 64,
+        "height": 64,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": true,
+        "shadow": false,
+        "url": "index.html?window=floating-widget",
+        "x": 100,
+        "y": 100,
+        "focus": false
+      },
+      {
+        "label": "settings",
+        "title": "DictateAnywhere — Settings",
+        "visible": false,
+        "width": 760,
+        "height": 560,
+        "minWidth": 680,
+        "minHeight": 460,
+        "decorations": true,
+        "transparent": false,
+        "center": true,
+        "theme": "Dark",
+        "url": "index.html?window=settings"
+      },
+      {
+        "label": "preview",
+        "title": "DictateAnywhere Preview",
+        "visible": false,
+        "width": 480,
+        "height": 110,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "shadow": false,
+        "url": "index.html?window=preview",
+        "x": 50,
+        "y": 50,
+        "focus": false
+      },
+      {
+        "label": "history",
+        "title": "DictateAnywhere — History",
+        "visible": false,
+        "width": 800,
+        "height": 580,
+        "minWidth": 720,
+        "minHeight": 480,
+        "decorations": true,
+        "transparent": false,
+        "center": true,
+        "theme": "Dark",
+        "url": "index.html?window=history"
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "wix": {
+        "language": "en-US",
+        "upgradeCode": "B7A2C4D6-E8F0-4A1B-9C3D-5E7F2A4B6C8D"
+      },
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": ["English"]
+      }
+    },
+    "externalBin": [
+      "binaries/whisper_sidecar"
+    ]
+  }
+}

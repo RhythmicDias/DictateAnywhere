@@ -92,8 +92,12 @@ class GeminiEngine(STTEngine):
 
             url = URL_TEMPLATE.format(model=self._model, key=self._api_key)
             
-            # Simple prompt for transcription
-            prompt = "Transcribe the following audio accurately. Output only the transcript text."
+            # Prompt for transcription — excluding filler words and hesitations
+            prompt = (
+                "Transcribe the following audio accurately. "
+                "Omit filler words, hesitation sounds, and verbal disfluencies (such as 'um', 'uh', 'hmm', 'ah', 'er'). "
+                "Output only the clean transcript text with proper punctuation and capitalization, without preamble or quotation marks."
+            )
             if lang_to_use and lang_to_use != "auto":
                 prompt += f" The language is {lang_to_use}."
 

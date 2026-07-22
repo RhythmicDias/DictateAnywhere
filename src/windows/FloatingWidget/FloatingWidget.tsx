@@ -13,7 +13,7 @@ import { useEffect, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen, emit } from "@tauri-apps/api/event";
 import { useDictationStore, type DictationState } from "../../store/dictationStore";
-import { setupDictationListeners } from "../../lib/events";
+import { setupDictationListeners, useWakeRecovery } from "../../lib/events";
 import { getConfig } from "../../lib/commands";
 import "./FloatingWidget.css";
 
@@ -98,15 +98,25 @@ export default function FloatingWidget() {
   const [maxSeconds, setMaxSeconds] = useState<number>(30);
 
   const col = COLOURS[state];
+  const wakeTrigger = useWakeRecovery();
 
   // ── Subscribe to Tauri events & config ────────────────────────────────────
   useEffect(() => {
+    let active = true;
     let cleanup: (() => void) | null = null;
-    setupDictationListeners().then((fn) => { cleanup = fn; });
+
+    setupDictationListeners().then((fn) => {
+      if (active) {
+        cleanup = fn;
+      } else {
+        fn();
+      }
+    });
 
     // Load config on mount
     getConfig()
       .then((cfg) => {
+        if (!active) return;
         if (cfg) {
           const size = Number(cfg.widget_size) || 64;
           const opacity = Number(cfg.widget_opacity) || 0.85;
@@ -121,6 +131,7 @@ export default function FloatingWidget() {
     // Listen to live changes
     let unlistenConfig: (() => void) | null = null;
     listen<any>("config://changed", (event) => {
+      if (!active) return;
       const cfg = event.payload;
       if (cfg) {
         const size = Number(cfg.widget_size) || 64;
@@ -131,33 +142,19 @@ export default function FloatingWidget() {
         setMaxSeconds(maxSec);
       }
     }).then((un) => {
-      unlistenConfig = un;
+      if (active) {
+        unlistenConfig = un;
+      } else {
+        un();
+      }
     });
 
     return () => {
+      active = false;
       cleanup?.();
       unlistenConfig?.();
     };
-  }, []);
-
-  // ── Re-subscribe listeners on window focus (post-sleep recovery) ───────────
-  // WebView2 can silently drop Tauri event subscriptions when the system sleeps.
-  // Re-registering on focus ensures the widget is always responsive after wake.
-  useEffect(() => {
-    let activeCleanup: (() => void) | null = null;
-
-    const handleFocus = async () => {
-      // Tear down stale listeners first
-      activeCleanup?.();
-      activeCleanup = await setupDictationListeners();
-    };
-
-    window.addEventListener("focus", handleFocus);
-    return () => {
-      window.removeEventListener("focus", handleFocus);
-      activeCleanup?.();
-    };
-  }, []);
+  }, [wakeTrigger]);
 
   // ── Countdown timer (active state) ────────────────────────────────────────
   useEffect(() => {

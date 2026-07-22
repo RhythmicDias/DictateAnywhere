@@ -117,3 +117,8 @@ class TestCleanWhisperArtifacts:
 
     def test_removes_lone_period(self):
         assert clean_whisper_artifacts(".") == ""
+
+    def test_removes_filler_words(self):
+        assert clean_whisper_artifacts("I think, um, that this works uh well.") == "I think that this works well."
+        assert clean_whisper_artifacts("Hmm, hello world") == "hello world"
+

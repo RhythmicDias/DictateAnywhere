@@ -1,0 +1,596 @@
+/* SettingsWindow.css
+ * Sleek, dark-themed, glassmorphism UI for DictateAnywhere Settings.
+ * Updated to Amber & Champagne luxury theme using CSS custom properties.
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --font-family: 'Outfit', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --bg-main: #141210;
+  --bg-gradient: linear-gradient(135deg, #141210 0%, #1e1a17 100%);
+  --bg-sidebar: rgba(32, 28, 25, 0.45);
+  --bg-card: rgba(32, 28, 25, 0.6);
+  --bg-input: #0f0d0b;
+  --bg-footer: rgba(20, 18, 16, 0.85);
+  --bg-modal: #1c1815;
+  --bg-slider: #2c2722;
+  
+  --border-color: rgba(255, 255, 255, 0.07);
+  --border-color-focus: #d97706;
+  
+  --text-primary: #fdf8f5;
+  --text-secondary: #bcaea3;
+  --text-muted: #948b83;
+  
+  --accent-primary: #d97706;
+  --accent-hover: #f59e0b;
+  --accent-glow: rgba(217, 119, 6, 0.25);
+  --accent-peach: #f5b089;
+  
+  --danger-color: #f38ba8;
+  --danger-bg: rgba(243, 139, 168, 0.1);
+  --danger-hover-bg: rgba(243, 139, 168, 0.18);
+  --danger-border: rgba(243, 139, 168, 0.2);
+  --danger-hover-border: rgba(243, 139, 168, 0.3);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: var(--font-family);
+}
+
+body {
+  background: var(--bg-main);
+  color: var(--text-primary);
+  overflow: hidden;
+  height: 100vh;
+}
+
+.settings-root {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--bg-gradient);
+}
+
+/* ── Container Layout ──────────────────────────────────────────────── */
+.settings-container {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  border-bottom: 1px solid var(--border-color);
+}
+
+/* ── Sidebar Styling ────────────────────────────────────────────────── */
+.settings-sidebar {
+  width: 220px;
+  background: var(--bg-sidebar);
+  backdrop-filter: blur(10px);
+  border-right: 1px solid var(--border-color);
+  padding: 16px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+}
+
+.settings-sidebar h3 {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding-left: 12px;
+  margin-bottom: 8px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 14px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.tab-btn:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-primary);
+  transform: translateX(2px);
+}
+
+.tab-btn.active {
+  background: var(--accent-glow);
+  color: var(--accent-primary);
+  box-shadow: inset 0 0 0 1px rgba(217, 119, 6, 0.2);
+}
+
+.tab-btn svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  stroke-width: 2;
+}
+
+/* ── Content Pane ──────────────────────────────────────────────────── */
+.settings-content {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.settings-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.settings-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.settings-content::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+}
+
+.tab-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--accent-peach);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.setting-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.setting-card-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 8px;
+  margin-bottom: 4px;
+}
+
+/* ── Form Controls ─────────────────────────────────────────────────── */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-group label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.form-group-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.form-group-row label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.form-helper {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* ── Inputs ────────────────────────────────────────────────────────── */
+input[type="text"],
+input[type="number"],
+input[type="password"],
+select,
+textarea {
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-primary);
+  padding: 8px 12px;
+  font-size: 13px;
+  outline: none;
+  width: 100%;
+  transition: all 0.15s ease;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--border-color-focus);
+  box-shadow: 0 0 0 2px var(--accent-glow);
+}
+
+input[disabled],
+select[disabled],
+textarea[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.input-with-button {
+  display: flex;
+  gap: 8px;
+}
+
+/* ── Custom Switch Toggle ──────────────────────────────────────────── */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--bg-slider);
+  transition: 0.25s;
+  border-radius: 24px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: var(--text-primary);
+  transition: 0.25s;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+}
+
+input:checked + .slider {
+  background-color: var(--accent-primary);
+}
+
+input:checked + .slider:before {
+  transform: translateX(20px);
+  background-color: var(--bg-main);
+}
+
+/* ── Slider / Range styling ────────────────────────────────────────── */
+.range-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.range-container input[type="range"] {
+  flex: 1;
+  height: 6px;
+  -webkit-appearance: none;
+  background: var(--bg-slider);
+  border-radius: 4px;
+  outline: none;
+}
+
+.range-container input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent-primary);
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+
+.range-container input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+.range-val {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent-primary);
+  min-width: 36px;
+  text-align: right;
+}
+
+/* ── Buttons ───────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: none;
+  outline: none;
+  white-space: nowrap;
+}
+
+.btn-primary {
+  background: var(--accent-primary);
+  color: var(--bg-main);
+  box-shadow: 0 4px 12px var(--accent-glow);
+}
+
+.btn-primary:hover {
+  background: var(--accent-hover);
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.btn-danger {
+  background: var(--danger-bg);
+  color: var(--danger-color);
+  border: 1px solid var(--danger-border);
+}
+
+.btn-danger:hover {
+  background: var(--danger-hover-bg);
+  border-color: var(--danger-hover-border);
+}
+
+.btn-sm {
+  padding: 4px 8px;
+  font-size: 11px;
+}
+
+.btn:active {
+  transform: scale(0.98);
+}
+
+/* ── Footer ────────────────────────────────────────────────────────── */
+.settings-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  background: var(--bg-footer);
+  backdrop-filter: blur(10px);
+  gap: 12px;
+}
+
+.footer-left {
+  display: flex;
+  gap: 8px;
+}
+
+.footer-right {
+  display: flex;
+  gap: 8px;
+}
+
+/* ── Lists / Tables (Corrections, App Launcher) ───────────────────── */
+.table-container {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-input);
+  overflow: hidden;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.settings-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  text-align: left;
+}
+
+.settings-table th, 
+.settings-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-color);
+  vertical-align: middle;
+}
+
+.settings-table th {
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.settings-table tr:last-child td {
+  border-bottom: none;
+}
+
+.table-input {
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.15) !important;
+  border-radius: 0 !important;
+  padding: 2px 4px !important;
+  width: 100%;
+}
+
+.table-input:focus {
+  border-bottom-color: var(--accent-primary) !important;
+  box-shadow: none !important;
+}
+
+.table-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+/* ── Hotkey Input capture ──────────────────────────────────────────── */
+.hotkey-capturer {
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 14px;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--accent-hover);
+  letter-spacing: 0.5px;
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 2px 6px rgba(0,0,0,0.3);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.hotkey-capturer.recording {
+  border-color: var(--danger-color);
+  color: var(--danger-color);
+  box-shadow: 0 0 8px rgba(243, 139, 168, 0.25), inset 0 2px 6px rgba(0,0,0,0.3);
+  animation: pulse-border 1.5s infinite;
+}
+
+@keyframes pulse-border {
+  0% { border-color: rgba(243, 139, 168, 0.6); }
+  50% { border-color: rgba(243, 139, 168, 1); }
+  100% { border-color: rgba(243, 139, 168, 0.6); }
+}
+
+/* ── Connection Test status indicator ──────────────────────────────── */
+.connection-status {
+  font-size: 12px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.connection-status.success {
+  color: #a6e3a1;
+}
+
+.connection-status.error {
+  color: var(--danger-color);
+}
+
+.connection-status.testing {
+  color: var(--accent-hover);
+}
+
+/* ── Grid/Column fields ────────────────────────────────────────────── */
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+/* ── Modal overlay for Microphone Level Meter ─────────────────────── */
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(17, 17, 27, 0.7);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: var(--bg-modal);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 24px;
+  width: 420px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  animation: modal-fade-in 0.2s ease-out;
+}
+
+@keyframes modal-fade-in {
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.modal-content h4 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.mic-meter-container {
+  width: 100%;
+  height: 24px;
+  background: var(--bg-input);
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  margin-top: 20px;
+  margin-bottom: 8px;
+  overflow: hidden;
+  position: relative;
+}
+
+.mic-meter-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #a6e3a1 0%, #94e2d5 100%);
+  border-radius: 6px;
+  transition: width 0.05s ease-out;
+}

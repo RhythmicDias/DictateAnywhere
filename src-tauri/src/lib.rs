@@ -25,7 +25,6 @@ use commands::hotkey::{register_hotkey, unregister_hotkey, register_polish_hotke
 use commands::sidecar::{SidecarState, start_sidecar, start_sidecar_with_state, send_to_sidecar, send_to_sidecar_owned, stop_sidecar, list_audio_devices, restart_sidecar_internal};
 use commands::injection::inject_text;
 use commands::storage::{get_api_key, set_api_key};
-use std::sync::atomic::Ordering;
 
 /// Emit a Tauri event to all windows.
 pub fn emit_all<R: Runtime, S: serde::Serialize + Clone>(
@@ -248,22 +247,14 @@ fn handle_system_wake(app: &AppHandle) {
     setup_polish_hotkey(app);
     println!("[Wake] Hotkeys re-registered.");
 
-    // 3. Restart the sidecar if it's dead
-    let sidecar_state = app.state::<SidecarState>();
-    let is_ready = sidecar_state.ready.load(Ordering::SeqCst);
-    let has_child = sidecar_state.child.lock().unwrap().is_some();
-
-    if !is_ready || !has_child {
-        println!("[Wake] Sidecar not ready — scheduling restart.");
-        let handle = app.clone();
-        tauri::async_runtime::spawn(async move {
-            // Give the OS a moment to fully restore network/GPU after resume
-            tokio::time::sleep(std::time::Duration::from_secs(3)).await;
-            restart_sidecar_internal(handle).await;
-        });
-    } else {
-        println!("[Wake] Sidecar appears alive — no restart needed.");
-    }
+    // 3. Always restart the sidecar on system wake to ensure audio capture and device states are cleanly re-initialized
+    println!("[Wake] Scheduling sidecar restart to recover audio devices...");
+    let handle = app.clone();
+    tauri::async_runtime::spawn(async move {
+        // Give the OS a moment to fully restore network/GPU/audio after resume
+        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+        restart_sidecar_internal(handle).await;
+    });
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -469,12 +460,17 @@ pub fn run() {
                     let azure_key = get_api_key("azure".to_string()).ok().flatten().unwrap_or_default();
                     let gemini_key = get_api_key("gemini".to_string()).ok().flatten().unwrap_or_default();
                     let sarvam_key = get_api_key("sarvam".to_string()).ok().flatten().unwrap_or_default();
+                    let openrouter_key = get_api_key("openrouter".to_string()).ok().flatten().unwrap_or_default();
+                    let groq_key = get_api_key("groq".to_string()).ok().flatten().unwrap_or_default();
 
                     let api_keys = serde_json::json!({
                         "azure": azure_key,
                         "gemini": gemini_key,
-                        "sarvam": sarvam_key
+                        "sarvam": sarvam_key,
+                        "openrouter": openrouter_key,
+                        "groq": groq_key
                     });
+
                     let payload = serde_json::json!({
                         "cmd": "start",
                         "config": config,

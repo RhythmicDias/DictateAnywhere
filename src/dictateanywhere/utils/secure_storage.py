@@ -21,6 +21,8 @@ _SERVICE = "DictateAnywhere"
 AZURE_SPEECH_KEY = "azure_speech_api_key"
 SARVAM_API_KEY = "sarvam_api_key"
 GEMINI_API_KEY = "gemini_api_key"
+OPENROUTER_API_KEY = "openrouter_api_key"
+GROQ_API_KEY = "groq_api_key"
 
 
 class SecureStorage:
@@ -109,6 +111,35 @@ class SecureStorage:
 
     def has_gemini_key(self) -> bool:
         return self.exists(GEMINI_API_KEY)
+
+    # ── Named helpers — OpenRouter ────────────────────────────────────────────
+
+    def store_openrouter_key(self, api_key: str) -> bool:
+        return self.store(OPENROUTER_API_KEY, api_key)
+
+    def get_openrouter_key(self) -> Optional[str]:
+        return self.retrieve(OPENROUTER_API_KEY)
+
+    def delete_openrouter_key(self) -> bool:
+        return self.delete(OPENROUTER_API_KEY)
+
+    def has_openrouter_key(self) -> bool:
+        return self.exists(OPENROUTER_API_KEY)
+
+    # ── Named helpers — Groq ──────────────────────────────────────────────────
+
+    def store_groq_key(self, api_key: str) -> bool:
+        return self.store(GROQ_API_KEY, api_key)
+
+    def get_groq_key(self) -> Optional[str]:
+        return self.retrieve(GROQ_API_KEY)
+
+    def delete_groq_key(self) -> bool:
+        return self.delete(GROQ_API_KEY)
+
+    def has_groq_key(self) -> bool:
+        return self.exists(GROQ_API_KEY)
+
 
     # ── Diagnostics ───────────────────────────────────────────────────────────
 

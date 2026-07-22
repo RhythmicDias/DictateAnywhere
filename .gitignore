@@ -28,10 +28,16 @@ ENV/
 *.manifest
 *.spec.bak
 
+# ─── Node & Tauri ─────────────────────────────────────────────────────────────
+node_modules/
+dist/
+src-tauri/target/
+
 # ─── PyInstaller output ───────────────────────────────────────────────────────
 dist/
 build/
-*.spec
+build_pyinstaller/
+!sidecar/whisper_sidecar.spec
 
 # ─── IDE & editors ────────────────────────────────────────────────────────────
 .vscode/

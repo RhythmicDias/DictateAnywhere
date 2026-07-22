@@ -70,6 +70,10 @@ class LocalEngine(STTEngine):
         """Load (or download) the Whisper model. Blocks until ready."""
         if self._status == EngineStatus.READY:
             return True
+        if self._status == EngineStatus.LOADING:
+            while self._status == EngineStatus.LOADING:
+                time.sleep(0.1)
+            return self._status == EngineStatus.READY
         self._status = EngineStatus.LOADING
         try:
             import ctranslate2

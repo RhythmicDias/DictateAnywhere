@@ -347,6 +347,8 @@ class TextInjector:
         Works in apps that intercept or block clipboard paste.
         """
         try:
+            # Derive character delay from self._delay (defaults to 50ms -> 5ms char delay)
+            char_delay = max(0.005, self._delay / 10.0)
             for char in text:
                 code = ord(char)
                 
@@ -358,7 +360,7 @@ class TextInjector:
                 ctypes.windll.user32.SendInput(1, event_down, ctypes.sizeof(Input))
                 
                 # Tiny sleep to ensure KeyDown is processed before KeyUp
-                time.sleep(0.005)
+                time.sleep(char_delay)
                 
                 # key up
                 ki_up = KeyBdInput(0, code, KEYEVENTF_UNICODE | KEYEVENTF_KEYUP, 0, 0)
@@ -368,7 +370,7 @@ class TextInjector:
                 ctypes.windll.user32.SendInput(1, event_up, ctypes.sizeof(Input))
                 
                 # Avoid flooding the target app's message loop
-                time.sleep(0.005)
+                time.sleep(char_delay)
 
             logger.info("Injected %d chars via SENDINPUT", len(text))
             return True

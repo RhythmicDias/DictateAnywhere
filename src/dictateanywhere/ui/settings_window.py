@@ -740,6 +740,47 @@ class SettingsDialog(QDialog):
         self.lbl_gemini_test = QLabel("")
         gm_lay.addWidget(self.lbl_gemini_test)
 
+        # 4. OpenRouter card
+        card_or = self._create_card(layout)
+        or_lay = card_or.layout()
+        lbl_or_title = QLabel("OpenRouter")
+        lbl_or_title.setProperty("class", "cardTitle")
+        lbl_or_sub = QLabel("API access to top AI models")
+        lbl_or_sub.setProperty("class", "cardSubtitle")
+        or_lay.addWidget(lbl_or_title)
+        or_lay.addWidget(lbl_or_sub)
+        self.txt_openrouter_key = QLineEdit()
+        self.txt_openrouter_key.setEchoMode(QLineEdit.Password)
+        or_lay.addWidget(QLabel("API KEY"))
+        or_lay.addWidget(self.txt_openrouter_key)
+        btn_test_or = QPushButton("Test OpenRouter connection")
+        btn_test_or.setProperty("class", "btnTest")
+        btn_test_or.clicked.connect(self._test_openrouter)
+        or_lay.addWidget(btn_test_or)
+        self.lbl_openrouter_test = QLabel("")
+        or_lay.addWidget(self.lbl_openrouter_test)
+
+        # 5. Groq API card
+        card_gq = self._create_card(layout)
+        gq_lay = card_gq.layout()
+        lbl_gq_title = QLabel("Groq API")
+        lbl_gq_title.setProperty("class", "cardTitle")
+        lbl_gq_sub = QLabel("Ultra-fast inference engine")
+        lbl_gq_sub.setProperty("class", "cardSubtitle")
+        gq_lay.addWidget(lbl_gq_title)
+        gq_lay.addWidget(lbl_gq_sub)
+        self.txt_groq_key = QLineEdit()
+        self.txt_groq_key.setEchoMode(QLineEdit.Password)
+        gq_lay.addWidget(QLabel("API KEY"))
+        gq_lay.addWidget(self.txt_groq_key)
+        btn_test_gq = QPushButton("Test Groq connection")
+        btn_test_gq.setProperty("class", "btnTest")
+        btn_test_gq.clicked.connect(self._test_groq)
+        gq_lay.addWidget(btn_test_gq)
+        self.lbl_groq_test = QLabel("")
+        gq_lay.addWidget(self.lbl_groq_test)
+
+
     def _create_tab_advanced(self, layout: QVBoxLayout) -> None:
         card = self._create_card(layout)
         card_lay = card.layout()
@@ -846,9 +887,10 @@ class SettingsDialog(QDialog):
             card_lay, "Enable Polish mode", "Sends transcribed text to an LLM to rewrite/format"
         )
         self.combo_polish_provider = self._add_combo_field(
-            card_lay, "Polish Provider", ["none", "ollama", "gemini"],
-            "Ollama = local (private). Gemini = cloud."
+            card_lay, "Polish Provider", ["none", "ollama", "gemini", "openrouter", "groq"],
+            "Ollama = local. Gemini, OpenRouter, Groq = cloud."
         )
+
         self.combo_polish_action = self._add_combo_field(
             card_lay, "Polish Action", 
             ["Fix Grammar & Spelling", "Make Professional", "Summarize", "Chat", "Custom Prompt"],
@@ -878,6 +920,21 @@ class SettingsDialog(QDialog):
             gm_lay, "Gemini Model", ["gemini-flash-lite-latest", "gemini-2.0-flash-lite"],
             "Flash Lite is recommended for latency speed."
         )
+
+        # OpenRouter
+        card_or_polish = self._create_card(layout)
+        or_p_lay = card_or_polish.layout()
+        or_p_lay.addWidget(QLabel("OPENROUTER MODEL"))
+        self.txt_polish_openrouter_model = QLineEdit()
+        or_p_lay.addWidget(self.txt_polish_openrouter_model)
+
+        # Groq
+        card_gq_polish = self._create_card(layout)
+        gq_p_lay = card_gq_polish.layout()
+        gq_p_lay.addWidget(QLabel("GROQ MODEL"))
+        self.txt_polish_groq_model = QLineEdit()
+        gq_p_lay.addWidget(self.txt_polish_groq_model)
+
 
     def _create_tab_app_launcher(self, layout: QVBoxLayout) -> None:
         card = self._create_card(layout)
@@ -1045,6 +1102,9 @@ class SettingsDialog(QDialog):
         self.txt_gemini_key.setText(sec.get_gemini_key() or "")
         self.combo_gemini_model.setCurrentText(str(cfg.get("gemini_stt_model", "gemini-flash-lite-latest")))
         self.combo_gemini_lang.setCurrentText(str(cfg.get("gemini_stt_language", "en")))
+        self.txt_openrouter_key.setText(sec.get_openrouter_key() or "")
+        self.txt_groq_key.setText(sec.get_groq_key() or "")
+
 
         # Advanced Tab
         self.chk_punctuation.setChecked(bool(cfg.get("spoken_punctuation", True)))
@@ -1063,6 +1123,9 @@ class SettingsDialog(QDialog):
         self.txt_custom_prompt.setText(str(cfg.get("custom_polish_prompt", "")))
         self.txt_ollama_url.setText(str(cfg.get("ollama_url", "http://localhost:11434")))
         self.combo_polish_gemini_model.setCurrentText(str(cfg.get("polish_gemini_model", "gemini-flash-lite-latest")))
+        self.txt_polish_openrouter_model.setText(str(cfg.get("polish_openrouter_model", "")))
+        self.txt_polish_groq_model.setText(str(cfg.get("polish_groq_model", "")))
+
 
     def _save_settings(self) -> None:
         cfg = self.ctrl._cfg
@@ -1123,7 +1186,10 @@ class SettingsDialog(QDialog):
             "custom_polish_prompt": self.txt_custom_prompt.text().strip(),
             "ollama_url": self.txt_ollama_url.text().strip(),
             "polish_gemini_model": self.combo_polish_gemini_model.currentText(),
+            "polish_openrouter_model": self.txt_polish_openrouter_model.text().strip(),
+            "polish_groq_model": self.txt_polish_groq_model.text().strip(),
         }
+
 
         # Mic device
         lbl_str = self.combo_mic.currentText()
@@ -1139,6 +1205,9 @@ class SettingsDialog(QDialog):
         sec.store_azure_key(self.txt_azure_key.text().strip())
         sec.store_sarvam_key(self.txt_sarvam_key.text().strip())
         sec.store_gemini_key(self.txt_gemini_key.text().strip())
+        sec.store_openrouter_key(self.txt_openrouter_key.text().strip())
+        sec.store_groq_key(self.txt_groq_key.text().strip())
+
 
         cfg.update(data)
         cfg.save()
@@ -1232,6 +1301,35 @@ class SettingsDialog(QDialog):
             self.lbl_gemini_test.setText(f"{'✅' if ok else '❌'} {msg}")
 
         threading.Thread(target=_run, daemon=True).start()
+
+    def _test_openrouter(self) -> None:
+        key = self.txt_openrouter_key.text().strip()
+        if not key:
+            self.lbl_openrouter_test.setText("❌ Please enter an API key first")
+            return
+        self.lbl_openrouter_test.setText("⏳ Testing connection...")
+
+        def _run():
+            from ..core.polish import test_openrouter_connection
+            ok, msg = test_openrouter_connection(key)
+            self.lbl_openrouter_test.setText(f"{'✅' if ok else '❌'} {msg}")
+
+        threading.Thread(target=_run, daemon=True).start()
+
+    def _test_groq(self) -> None:
+        key = self.txt_groq_key.text().strip()
+        if not key:
+            self.lbl_groq_test.setText("❌ Please enter an API key first")
+            return
+        self.lbl_groq_test.setText("⏳ Testing connection...")
+
+        def _run():
+            from ..core.polish import test_groq_connection
+            ok, msg = test_groq_connection(key)
+            self.lbl_groq_test.setText(f"{'✅' if ok else '❌'} {msg}")
+
+        threading.Thread(target=_run, daemon=True).start()
+
 
     def _test_hotkey(self) -> None:
         hk = self.txt_hotkey.text().strip()

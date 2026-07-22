@@ -1,0 +1,28 @@
+# src-tauri/permissions/default.toml
+# Custom app-local permissions for DictateAnywhere commands.
+
+[[permission]]
+identifier = "allow-all-commands"
+description = "Allows all custom backend commands to be invoked by the frontend"
+commands.allow = [
+    "get_config",
+    "save_config",
+    "get_corrections",
+    "save_corrections",
+    "select_file",
+    "export_text_file",
+    "register_hotkey",
+    "unregister_hotkey",
+    "start_sidecar",
+    "send_to_sidecar",
+    "stop_sidecar",
+    "list_audio_devices",
+    "inject_text",
+    "get_api_key",
+    "set_api_key",
+    "get_cached_models",
+    "delete_cached_model",
+    "get_ollama_models",
+    "check_for_updates",
+    "open_config_folder"
+]

@@ -105,6 +105,22 @@ pub fn start_sidecar_with_state(app: AppHandle, state: SidecarState) -> Result<(
                                             "state" => {
                                                 if let Some(s) = value.get("state").and_then(|s| s.as_str()) {
                                                     let _ = app_handle.emit("dictation://state-changed", s);
+
+                                                    // Native handling: Show preview overlay window when recording starts
+                                                    if s == "active" {
+                                                        let show_preview = if let Ok(cfg) = super::config::get_config() {
+                                                            cfg.get("show_preview_window")
+                                                                .and_then(|v| v.as_bool())
+                                                                .unwrap_or(true)
+                                                        } else {
+                                                            true
+                                                        };
+                                                        if show_preview {
+                                                            if let Some(preview_win) = app_handle.get_webview_window("preview") {
+                                                                let _ = preview_win.show();
+                                                            }
+                                                        }
+                                                    }
                                                 }
                                             }
                                             "audio_level" => {
@@ -122,7 +138,10 @@ pub fn start_sidecar_with_state(app: AppHandle, state: SidecarState) -> Result<(
                                                     } else {
                                                         (None, None)
                                                     };
-                                                    let _ = super::injection::inject_text(text.to_string(), method, delay).await;
+                                                    if let Err(e) = super::injection::inject_text(text.to_string(), method, delay).await {
+                                                         eprintln!("[Rust] Text injection failed: {}", e);
+                                                         let _ = app_handle.emit("dictation://error", format!("Injection failed: {}", e));
+                                                     }
                                                     let _ = app_handle.emit("dictation://transcription-result", value.clone());
                                                 }
                                             }

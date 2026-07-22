@@ -1,0 +1,1 @@
+{"default-capability":{"identifier":"default-capability","description":"Default capability for DictateAnywhere windows","local":true,"windows":["*"],"permissions":["core:default","allow-all-commands","core:window:allow-hide","core:window:allow-show","core:window:allow-close","core:window:allow-start-dragging"]}}

@@ -133,11 +133,32 @@ def process(text: str, previous_text: str = "", apply_punctuation: bool = True,
     return text
 
 
+_FILLER_WORDS_PATTERN = re.compile(
+    r",?\s*\b(u+m+|u+h+|h+m+|a+h+|e+r+|e+h+|m+h+m+|uh-huh)\b[,\s]*",
+    flags=re.IGNORECASE
+)
+
+
+def remove_filler_words(text: str) -> str:
+    """
+    Remove spoken filler words and hesitation sounds (e.g. 'um', 'uh', 'hmm', 'ah', 'er').
+    """
+    if not text:
+        return text
+    # Match filler words along with optional preceding/following commas & whitespace
+    text = _FILLER_WORDS_PATTERN.sub(" ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    text = re.sub(r"^\s*[,;:]\s*", "", text)
+    text = re.sub(r"\s+([.?!,;:\'\"])", r"\1", text)
+    return text
+
+
 def clean_whisper_artifacts(text: str) -> str:
     """
-    Remove known Whisper hallucination patterns.
+    Remove known Whisper hallucination patterns and verbal filler words.
 
     Strips:
+      - Verbal filler words ("um", "uh", "hmm", "ah", "er")
       - Bracketed/parenthesised noise tags like [Music] or (inaudible)
       - A lone period (common silence hallucination)
       - Common hallucination phrases on silence ("Thank you.", "You.", etc.)
@@ -149,6 +170,9 @@ def clean_whisper_artifacts(text: str) -> str:
         "bye.", "bye", "the end.", "the end",
         "d episode.", "d episode",
     })
+
+    # First remove disfluency filler words
+    text = remove_filler_words(text)
 
     patterns = [
         r"\[.*?\]",          # [Music], [Applause], [BLANK_AUDIO] …

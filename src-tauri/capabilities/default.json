@@ -1,0 +1,14 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default-capability",
+  "description": "Default capability for DictateAnywhere windows",
+  "windows": ["*"],
+  "permissions": [
+    "core:default",
+    "allow-all-commands",
+    "core:window:allow-hide",
+    "core:window:allow-show",
+    "core:window:allow-close",
+    "core:window:allow-start-dragging"
+  ]
+}

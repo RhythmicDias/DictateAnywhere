@@ -390,7 +390,7 @@ class DictateAnywhere:
 
             res = self._run_hybrid_transcription(audio_bytes)
             
-            if not res.success:
+            if res.error:
                 error_msg = f"Error: {res.error}"
                 logger.error("❌ %s %s", res.engine_name.title(), error_msg)
                 self._root.after(0, self._preview.show_status, error_msg)
@@ -455,8 +455,11 @@ class DictateAnywhere:
                         from .core.polish import polish_with_ollama
                         ollama_url = self._cfg.get("ollama_url", "http://localhost:11434")
                         ollama_model = self._cfg.get("polish_ollama_model", "llama3")
-                        logger.info("Polishing text using Ollama model %s with action: %s", ollama_model, action)
-                        text = polish_with_ollama(text, ollama_url, ollama_model, action, custom_prompt)
+                        timeout = float(self._cfg.get("polish_ollama_timeout", 90.0))
+                        logger.info("Polishing text using Ollama model %s with action: %s (timeout=%fs)", ollama_model, action, timeout)
+                        text, success, err = polish_with_ollama(text, ollama_url, ollama_model, action, custom_prompt, timeout=timeout)
+                        if not success:
+                            self._root.after(0, self._preview.show_status, f"Polish failed: {err[:30]}")
                         
                     elif provider == "gemini":
                         gemini_key = self._sec.get_gemini_key()
@@ -465,9 +468,41 @@ class DictateAnywhere:
                             from .core.polish import polish_with_gemini
                             gemini_model = self._cfg.get("polish_gemini_model", "gemini-flash-lite-latest")
                             logger.info("Polishing text using Gemini model %s with action: %s", gemini_model, action)
-                            text = polish_with_gemini(text, gemini_key, gemini_model, action, custom_prompt)
+                            text, success, err = polish_with_gemini(text, gemini_key, gemini_model, action, custom_prompt)
+                            if not success:
+                                self._root.after(0, self._preview.show_status, f"Polish failed: {err[:30]}")
                         else:
                             logger.warning("Gemini polish requested but no API key found")
+                            self._root.after(0, self._preview.show_status, "Polish failed: API key missing")
+
+                    elif provider == "openrouter":
+                        openrouter_key = self._sec.get_openrouter_key()
+                        if openrouter_key:
+                            self._root.after(0, self._preview.show_status, "Polishing with OpenRouter…")
+                            from .core.polish import polish_with_openrouter
+                            openrouter_model = self._cfg.get("polish_openrouter_model", "")
+                            logger.info("Polishing text using OpenRouter model %s with action: %s", openrouter_model, action)
+                            text, success, err = polish_with_openrouter(text, openrouter_key, openrouter_model, action, custom_prompt)
+                            if not success:
+                                self._root.after(0, self._preview.show_status, f"Polish failed: {err[:30]}")
+                        else:
+                            logger.warning("OpenRouter polish requested but no API key found")
+                            self._root.after(0, self._preview.show_status, "Polish failed: API key missing")
+
+                    elif provider == "groq":
+                        groq_key = self._sec.get_groq_key()
+                        if groq_key:
+                            self._root.after(0, self._preview.show_status, "Polishing with Groq…")
+                            from .core.polish import polish_with_groq
+                            groq_model = self._cfg.get("polish_groq_model", "")
+                            logger.info("Polishing text using Groq model %s with action: %s", groq_model, action)
+                            text, success, err = polish_with_groq(text, groq_key, groq_model, action, custom_prompt)
+                            if not success:
+                                self._root.after(0, self._preview.show_status, f"Polish failed: {err[:30]}")
+                        else:
+                            logger.warning("Groq polish requested but no API key found")
+                            self._root.after(0, self._preview.show_status, "Polish failed: API key missing")
+
                 
                 # Strip text completely to remove any leading spaces from Whisper
                 text = text.strip()
@@ -508,7 +543,10 @@ class DictateAnywhere:
         mode = self._cfg.get("engine_mode", "hybrid")
         lang = self._cfg.get("language", "auto")
 
-        if mode == "azure" or mode == "cloud": # cloud kept for compat
+        def _resolve_cloud_provider() -> str:
+            return self._cfg.get("cloud_provider") or self._cfg.get("cloud_fallback_provider") or "azure"
+
+        if mode == "azure":
             return self._cloud_transcribe(audio_bytes, lang)
 
         if mode == "gemini":
@@ -517,13 +555,23 @@ class DictateAnywhere:
         if mode == "sarvam":
             return self._sarvam_transcribe(audio_bytes, lang)
 
+        if mode == "cloud":
+            provider = _resolve_cloud_provider()
+            logger.info("Cloud mode active — routing to %s cloud STT engine", provider)
+            if provider == "gemini":
+                return self._gemini_transcribe(audio_bytes, lang)
+            elif provider == "sarvam":
+                return self._sarvam_transcribe(audio_bytes, lang)
+            else:
+                return self._cloud_transcribe(audio_bytes, lang)
+
         if mode == "local":
             return self._local_transcribe(audio_bytes, lang)
 
         # Hybrid: local first
         res = self._local_transcribe(audio_bytes, lang)
-        if not res.success and self._cfg.get("cloud_fallback_on_error", True):
-            provider = self._cfg.get("cloud_fallback_provider", "azure")
+        if res.error and self._cfg.get("cloud_fallback_on_error", True):
+            provider = _resolve_cloud_provider()
             logger.info("Local failed — falling back to %s engine", provider)
             if provider == "gemini":
                 res = self._gemini_transcribe(audio_bytes, lang)

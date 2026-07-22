@@ -1,0 +1,254 @@
+/* PreviewOverlay.css
+ * Styles for the transparent, floating, always-on-top transcription status overlay.
+ * Updated to Amber & Champagne theme.
+ */
+
+:root {
+  --font-family: 'Outfit', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --bg-overlay: rgba(32, 28, 25, 0.85);
+  --border-color: rgba(255, 255, 255, 0.08);
+  --text-primary: #fdf8f5;
+  --text-secondary: #bcaea3;
+  --text-muted: #948b83;
+  
+  --accent-active: #d97706; /* Amber */
+  --accent-active-glow: rgba(217, 119, 6, 0.15);
+  --accent-active-border: rgba(217, 119, 6, 0.3);
+  
+  --accent-loading: #f5b089; /* Peach */
+  --accent-loading-glow: rgba(245, 176, 137, 0.15);
+  --accent-loading-border: rgba(245, 176, 137, 0.3);
+  
+  --success-color: #a6e3a1; /* Success Green */
+  --success-glow: rgba(166, 227, 161, 0.15);
+  --success-border: rgba(166, 227, 161, 0.3);
+  
+  --danger-color: #f38ba8; /* Error Red */
+  --danger-glow: rgba(243, 139, 168, 0.15);
+  --danger-border: rgba(243, 139, 168, 0.3);
+}
+
+html, body, #root {
+  background: transparent !important;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  user-select: none;
+  -webkit-user-select: none;
+  font-family: var(--font-family);
+}
+
+body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── Container Pill ──────────────────────────────────────────────────── */
+.preview-root {
+  width: 380px;
+  height: 56px;
+  background: var(--bg-overlay);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--border-color);
+  border-radius: 28px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  cursor: grab;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.preview-root:active {
+  cursor: grabbing;
+}
+
+/* State-specific glowing borders */
+.preview-root.state-active {
+  border-color: var(--accent-active-border);
+  box-shadow: 0 4px 14px var(--accent-active-glow), 0 0 8px rgba(217, 119, 6, 0.08);
+}
+
+.preview-root.state-loading {
+  border-color: var(--accent-loading-border);
+  box-shadow: 0 4px 14px var(--accent-loading-glow), 0 0 8px rgba(245, 176, 137, 0.08);
+}
+
+.preview-root.state-injecting {
+  border-color: var(--success-border);
+  box-shadow: 0 4px 14px var(--success-glow), 0 0 8px rgba(166, 227, 161, 0.08);
+}
+
+.preview-root.state-error {
+  border-color: var(--danger-border);
+  box-shadow: 0 4px 14px var(--danger-glow), 0 0 8px rgba(243, 139, 168, 0.08);
+}
+
+/* ── Close Button (Left) ──────────────────────────────────────────────── */
+.btn-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-close:hover {
+  background: var(--danger-glow);
+  border-color: var(--danger-border);
+  color: var(--danger-color);
+  transform: scale(1.05);
+}
+
+.btn-close svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* ── Equalizer Visualizer (Center) ────────────────────────────────────── */
+.equalizer-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  flex: 1;
+  margin: 0 8px;
+  height: 36px;
+  overflow: hidden;
+}
+
+.eq-bar {
+  width: 3.5px;
+  border-radius: 2px;
+  min-height: 4px;
+  height: 4px;
+  background-color: var(--accent-active);
+  transition: background-color 0.3s ease, box-shadow 0.3s ease;
+  box-shadow: 0 0 4px rgba(255, 255, 255, 0.1);
+}
+
+/* Ready text shown when idle/error */
+.status-text {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  text-align: center;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  max-width: 100%;
+  animation: pulse-text 2s infinite ease-in-out;
+}
+
+.status-text.state-active {
+  color: var(--accent-active);
+}
+.status-text.state-loading {
+  color: var(--accent-loading);
+}
+.status-text.state-polishing {
+  color: #cba6f7; /* Lavender for AI polishing */
+}
+.status-text.state-injecting {
+  color: var(--success-color);
+}
+.status-text.state-error {
+  color: var(--danger-color);
+}
+
+@keyframes pulse-text {
+  0% { opacity: 0.8; }
+  50% { opacity: 1; text-shadow: 0 0 8px currentColor; }
+  100% { opacity: 0.8; }
+}
+
+/* ── Action/State Button (Right) ───────────────────────────────────────── */
+.btn-action {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-action:hover {
+  transform: scale(1.08);
+}
+
+/* Stop button */
+.btn-action.state-active {
+  background: var(--danger-color);
+  color: var(--bg-overlay);
+  box-shadow: 0 0 10px rgba(243, 139, 168, 0.4);
+}
+.btn-action.state-active:hover {
+  background: #f5e0dc;
+  box-shadow: 0 0 14px rgba(243, 139, 168, 0.6);
+}
+
+/* Transcribing state */
+.btn-action.state-loading {
+  background: var(--accent-loading);
+  color: var(--bg-overlay);
+  cursor: default;
+  box-shadow: 0 0 10px rgba(245, 176, 137, 0.4);
+}
+
+/* Polishing state */
+.btn-action.state-polishing {
+  background: #cba6f7;
+  color: var(--bg-overlay);
+  cursor: default;
+  box-shadow: 0 0 10px rgba(203, 166, 247, 0.4);
+}
+
+/* Injected state */
+.btn-action.state-injecting {
+  background: var(--success-color);
+  color: var(--bg-overlay);
+  cursor: default;
+  box-shadow: 0 0 10px rgba(166, 227, 161, 0.4);
+}
+
+/* Error state */
+.btn-action.state-error {
+  background: var(--danger-color);
+  color: var(--bg-overlay);
+  cursor: default;
+  box-shadow: 0 0 10px rgba(243, 139, 168, 0.4);
+}
+
+/* Spinning animation for loading state */
+.spinner {
+  animation: rotate 1.5s linear infinite;
+  width: 16px;
+  height: 16px;
+}
+
+@keyframes rotate {
+  100% { transform: rotate(360deg); }
+}

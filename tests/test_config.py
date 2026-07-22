@@ -19,6 +19,7 @@ class TestConfig:
     def test_defaults(self):
         c = Config()
         assert c.engine_mode == "hybrid"
+        assert c.cloud_provider == "azure"
         assert c.model_size == "small"
         assert c.hotkey == "ctrl+alt+d"
         assert c.language == "en"
@@ -87,3 +88,8 @@ class TestConfigManager:
         mgr.save()
         data = json.loads(path.read_text(encoding="utf-8"))
         assert data["engine_mode"] == "local"
+
+    def test_cloud_provider_setting(self, tmp_config):
+        tmp_config.set("cloud_provider", "gemini")
+        assert tmp_config.get("cloud_provider") == "gemini"
+
