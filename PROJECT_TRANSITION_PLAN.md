@@ -59,7 +59,7 @@ User presses hotkey
 ## Project Structure (Target)
 
 ```
-d:\PythonProjects\DictateAnywhere\
+DictateAnywhere/
 ├── src-tauri/
 │   ├── src/
 │   │   ├── main.rs
