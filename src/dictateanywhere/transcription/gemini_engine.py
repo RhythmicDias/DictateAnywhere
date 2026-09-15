@@ -18,7 +18,7 @@ from .engine import EngineStatus, STTEngine, TranscriptionResult
 logger = logging.getLogger(__name__)
 
 # https://ai.google.dev/gemini-api/docs/multimodal?lang=python#audio
-URL_TEMPLATE = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
+URL_TEMPLATE = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 
 class GeminiEngine(STTEngine):
     """
@@ -37,6 +37,7 @@ class GeminiEngine(STTEngine):
         self._api_key = api_key
         self._model = model
         self._language = language
+        self._session = requests.Session()
 
     def update_credentials(self, api_key: str) -> None:
         self._api_key = api_key
@@ -53,8 +54,9 @@ class GeminiEngine(STTEngine):
         if not self._api_key:
             return False, "API key missing."
         try:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models?key={self._api_key}"
-            resp = requests.get(url, timeout=10)
+            url = "https://generativelanguage.googleapis.com/v1beta/models"
+            headers = {"x-goog-api-key": self._api_key}
+            resp = self._session.get(url, headers=headers, timeout=10)
             if resp.status_code == 200:
                 return True, "Gemini connected successfully."
             else:
@@ -90,7 +92,11 @@ class GeminiEngine(STTEngine):
             # Encode audio to base64
             audio_b64 = base64.b64encode(audio_wav_bytes).decode("utf-8")
 
-            url = URL_TEMPLATE.format(model=self._model, key=self._api_key)
+            url = URL_TEMPLATE.format(model=self._model)
+            headers = {
+                "x-goog-api-key": self._api_key,
+                "Content-Type": "application/json"
+            }
             
             # Prompt for transcription — excluding filler words and hesitations
             prompt = (
@@ -120,7 +126,7 @@ class GeminiEngine(STTEngine):
                 }
             }
 
-            response = requests.post(url, json=payload, timeout=60)
+            response = self._session.post(url, headers=headers, json=payload, timeout=60)
             
             if response.status_code != 200:
                 msg = "Unknown Error"

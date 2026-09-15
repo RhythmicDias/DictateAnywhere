@@ -18,14 +18,14 @@ const HistoryWindow = lazy(
 
 function getWindowLabel(): string {
   const params = new URLSearchParams(window.location.search);
-  return params.get("window") ?? "main";
+  return params.get("window") ?? "floating-widget";
 }
 
 export default function App() {
   const windowLabel = getWindowLabel();
 
   useEffect(() => {
-    if (windowLabel !== "main") return;
+    if (windowLabel !== "floating-widget") return;
 
     let unlistenFn: (() => void) | null = null;
 

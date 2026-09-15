@@ -118,6 +118,13 @@ def strip_silence(
             if speech_started:
                 trailing_silence.append(frame)
 
+    if not speech_started:
+        return b""
+
+    # Preserve up to 5 frames (~150 ms) of trailing audio so word endings are not clipped
+    safety_frames = trailing_silence[:min(len(trailing_silence), 5)]
+    speech_frames.extend(safety_frames)
+
     result = b"".join(speech_frames)
     logger.debug(
         "strip_silence: %.2f s → %.2f s (removed %.0f%%)",

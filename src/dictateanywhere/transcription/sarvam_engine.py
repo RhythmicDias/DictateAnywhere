@@ -43,6 +43,7 @@ class SarvamEngine(STTEngine):
         self._api_key = api_key
         self._model = model
         self._language = language
+        self._session = requests.Session()
         
         self._ws: Optional[websocket.WebSocketApp] = None
         self._on_text: Optional[Callable[[str], None]] = None
@@ -79,7 +80,7 @@ class SarvamEngine(STTEngine):
             files = {"file": ("test.wav", wav_io, "audio/wav")}
             data = {"model": self._model}
             
-            resp = requests.post(URL, headers=headers, files=files, data=data, timeout=10)
+            resp = self._session.post(URL, headers=headers, files=files, data=data, timeout=10)
             if resp.status_code == 200:
                 return True, "Sarvam connected successfully."
             else:
@@ -215,7 +216,7 @@ class SarvamEngine(STTEngine):
                 data["language_code"] = lang_code
 
             logger.info("Sending request to Sarvam AI (model: %s, lang: %s)", self._model, lang_code)
-            response = requests.post(URL, headers=headers, files=files, data=data, timeout=15)
+            response = self._session.post(URL, headers=headers, files=files, data=data, timeout=15)
             
             if response.status_code != 200:
                 logger.error("Sarvam AI Error %d: %s", response.status_code, response.text)

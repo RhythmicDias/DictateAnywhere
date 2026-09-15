@@ -65,7 +65,7 @@ export const useHistoryStore = create<HistoryState>()(
             polishModel: modelVal,
             polishError: errorVal,
           };
-          return { entries: [newEntry, ...state.entries] };
+          return { entries: [newEntry, ...state.entries].slice(0, 200) };
         }),
       deleteEntry: (id) =>
         set((state) => ({

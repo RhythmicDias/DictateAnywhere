@@ -31,14 +31,8 @@ dependencies = [
     "faster-whisper>=1.0.3",
     "azure-cognitiveservices-speech>=1.37.0",
     "keyring>=25.2.1",
-    "pystray>=0.19.5",
-    "Pillow>=10.4.0",
-    "keyboard>=0.13.5; sys_platform == 'win32'",
-    "pywin32>=311; sys_platform == 'win32'",
-    "pyperclip>=1.9.0",
     "requests>=2.32.3",
-    "pynput>=1.7.6; sys_platform == 'darwin'",
-    "PySide6>=6.5.0",
+    "websocket-client>=1.6.0",
 ]
 
 
@@ -47,9 +41,6 @@ Homepage = "https://github.com/RhythmicDias/DictateAnywhere"
 Repository = "https://github.com/RhythmicDias/DictateAnywhere"
 "Bug Tracker" = "https://github.com/RhythmicDias/DictateAnywhere/issues"
 Changelog = "https://github.com/RhythmicDias/DictateAnywhere/blob/main/CHANGELOG.md"
-
-[project.scripts]
-dictateanywhere = "dictateanywhere.main:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

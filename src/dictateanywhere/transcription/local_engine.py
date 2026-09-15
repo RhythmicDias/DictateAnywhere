@@ -37,15 +37,20 @@ class LocalEngine(STTEngine):
     def __init__(
         self,
         model_size: str = "small",
-        compute_type: str = "int8",    # int8 = best CPU speed; float16 for GPU
+        compute_type: str = "int8",    # int8 for CPU; float16 for GPU
         device: str = "auto",          # cpu | cuda | auto
         language: str = "en",
+        beam_size: int = 1,
     ) -> None:
         super().__init__()
         self._model_size = model_size if model_size in SUPPORTED_MODELS else "small"
         self._compute_type = compute_type
         self._device = device
         self._language = language
+        self._beam_size = max(1, int(beam_size))
+        # Optimize default for CUDA (RTX 5060 Tensor Cores): float16 is ~2-3x faster than int8
+        if self._device == "cuda" and self._compute_type in ("int8", "auto", "default"):
+            self._compute_type = "float16"
         self._model = None
         self._lock = threading.Lock()
         MODELS_DIR.mkdir(parents=True, exist_ok=True)
@@ -64,6 +69,10 @@ class LocalEngine(STTEngine):
     def device(self) -> str:
         return self._device
 
+    @property
+    def beam_size(self) -> int:
+        return self._beam_size
+
     # ── STTEngine interface ────────────────────────────────────────────────────
 
     def load(self) -> bool:
@@ -81,6 +90,18 @@ class LocalEngine(STTEngine):
             logger.info("ctranslate2 version: %s", ctranslate2.__version__)
             logger.info("faster-whisper version: %s", faster_whisper.__version__)
             from faster_whisper import WhisperModel
+
+            # Auto-detect CUDA capability for optimal GPU acceleration
+            if self._device == "auto":
+                try:
+                    if ctranslate2.get_cuda_device_count() > 0:
+                        self._device = "cuda"
+                        if self._compute_type in ("int8", "auto", "default"):
+                            self._compute_type = "float16"
+                    else:
+                        self._device = "cpu"
+                except Exception:
+                    pass
 
             logger.info(
                 "Loading faster-whisper model %r (device=%s, compute_type=%s) …",
@@ -134,7 +155,12 @@ class LocalEngine(STTEngine):
             self._status = EngineStatus.ERROR
             return False
 
-    def transcribe(self, audio_bytes: bytes, language: str = "en") -> TranscriptionResult:
+    def transcribe(
+        self,
+        audio_bytes: bytes,
+        language: str = "en",
+        beam_size: Optional[int] = None,
+    ) -> TranscriptionResult:
         """Transcribe raw 16 kHz mono int16 PCM bytes."""
         if not self.is_ready:
             return TranscriptionResult(
@@ -152,12 +178,13 @@ class LocalEngine(STTEngine):
             if lang_code == "auto":
                 lang_code = None
 
+            active_beam = max(1, beam_size if beam_size is not None else self._beam_size)
             with self._lock:
                 segments, info = self._model.transcribe(  # type: ignore[union-attr]
                     audio_array,
                     language=lang_code,
-                    beam_size=1,
-                    best_of=1,
+                    beam_size=active_beam,
+                    best_of=active_beam,
                     temperature=0.0,
                     # Disable internal VAD filter if it's causing issues, 
                     # as we already have a high-quality capture-level VAD.
@@ -241,7 +268,12 @@ class LocalEngine(STTEngine):
     def set_device(self, device: str) -> None:
         if device != self._device:
             self._device = device
+            if self._device == "cuda" and self._compute_type in ("int8", "auto", "default"):
+                self._compute_type = "float16"
             self.unload()
+
+    def set_beam_size(self, beam_size: int) -> None:
+        self._beam_size = max(1, int(beam_size))
 
 
 def _pcm_to_float32(pcm_bytes: bytes) -> np.ndarray:

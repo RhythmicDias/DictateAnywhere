@@ -152,56 +152,36 @@ pub fn save_corrections(corrections: Value) -> Result<(), String> {
     Ok(())
 }
 
-/// Open a native Windows file dialogue using a PowerShell helper.
+/// Open a native Windows file dialogue using rfd (Common Item Dialog).
 #[command]
-pub fn select_file() -> Result<Option<String>, String> {
-    let output = std::process::Command::new("powershell")
-        .args(&[
-            "-NoProfile",
-            "-Command",
-            "[System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms') | Out-Null; $g = New-Object System.Windows.Forms.OpenFileDialog; $g.Title = 'Select Application or File'; $g.Filter = 'Executable Files (*.exe)|*.exe|All Files (*.*)|*.*'; if ($g.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { $g.FileName }",
-        ])
-        .output()
-        .map_err(|e| format!("Failed to run file dialogue: {e}"))?;
+pub async fn select_file() -> Result<Option<String>, String> {
+    let file = rfd::AsyncFileDialog::new()
+        .add_filter("Executable Files (*.exe)", &["exe"])
+        .add_filter("All Files (*.*)", &["*"])
+        .set_title("Select Application or File")
+        .pick_file()
+        .await;
 
-    let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    if path.is_empty() {
-        Ok(None)
-    } else {
-        Ok(Some(path))
-    }
+    Ok(file.map(|f| f.path().to_string_lossy().to_string()))
 }
 
-/// Write text to a file chosen by the user via a native Windows SaveFileDialog.
+/// Write text to a file chosen by the user via native Windows SaveFileDialog.
 #[command]
-pub fn export_text_file(text: String, default_filename: String) -> Result<Option<String>, String> {
-    let escaped_default = default_filename.replace("'", "''");
-    let ps_script = format!(
-        "[System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms') | Out-Null; \
-         $g = New-Object System.Windows.Forms.SaveFileDialog; \
-         $g.Title = 'Export Transcription History'; \
-         $g.Filter = 'Text Files (*.txt)|*.txt|All Files (*.*)|*.*'; \
-         $g.FileName = '{}'; \
-         if ($g.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {{ $g.FileName }}",
-        escaped_default
-    );
+pub async fn export_text_file(text: String, default_filename: String) -> Result<Option<String>, String> {
+    let file = rfd::AsyncFileDialog::new()
+        .add_filter("Text Files (*.txt)", &["txt"])
+        .add_filter("All Files (*.*)", &["*"])
+        .set_title("Export Transcription History")
+        .set_file_name(&default_filename)
+        .save_file()
+        .await;
 
-    let output = std::process::Command::new("powershell")
-        .args(&[
-            "-NoProfile",
-            "-Command",
-            &ps_script,
-        ])
-        .output()
-        .map_err(|e| format!("Failed to run file dialogue: {e}"))?;
-
-    let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    if path.is_empty() {
-        Ok(None)
+    if let Some(handle) = file {
+        let path = handle.path().to_path_buf();
+        std::fs::write(&path, text).map_err(|e| format!("Failed to write export file: {e}"))?;
+        Ok(Some(path.to_string_lossy().to_string()))
     } else {
-        std::fs::write(&path, text)
-            .map_err(|e| format!("Failed to write export file: {e}"))?;
-        Ok(Some(path))
+        Ok(None)
     }
 }
 

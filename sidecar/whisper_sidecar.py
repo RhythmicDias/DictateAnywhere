@@ -1,4 +1,6 @@
 # sidecar/whisper_sidecar.py
+from __future__ import annotations
+
 import os
 import sys
 import json
@@ -480,9 +482,10 @@ class SidecarRunner:
             if not ok:
                 return TranscriptionResult(text="", engine_name="local", error="Failed to load local Whisper model")
 
-        return self.local_engine.transcribe(audio_bytes, language=lang)
+        beam_size = int(params.get("beam_size", self.cfg.get("beam_size", 1)))
+        return self.local_engine.transcribe(audio_bytes, language=lang, beam_size=beam_size)
 
-    def cloud_transcribe(self, audio_bytes: bytes, lang: str, api_keys: Dict[str, String], params: Dict[str, Any]) -> TranscriptionResult:
+    def cloud_transcribe(self, audio_bytes: bytes, lang: str, api_keys: Dict[str, str], params: Dict[str, Any]) -> TranscriptionResult:
         key = api_keys.get("azure")
         region = params.get("cloud_region", self.cfg.get("cloud_region", "eastus"))
         if not key:
@@ -496,7 +499,7 @@ class SidecarRunner:
 
         return self.cloud_engine.transcribe(audio_bytes, language=lang)
 
-    def gemini_transcribe(self, audio_bytes: bytes, lang: str, api_keys: Dict[str, String], params: Dict[str, Any]) -> TranscriptionResult:
+    def gemini_transcribe(self, audio_bytes: bytes, lang: str, api_keys: Dict[str, str], params: Dict[str, Any]) -> TranscriptionResult:
         key = api_keys.get("gemini")
         model = params.get("gemini_stt_model", self.cfg.get("gemini_stt_model", "gemini-flash-lite-latest"))
         if not key:
@@ -511,7 +514,7 @@ class SidecarRunner:
 
         return self.gemini_engine.transcribe(audio_bytes, language=lang)
 
-    def sarvam_transcribe(self, audio_bytes: bytes, lang: str, api_keys: Dict[str, String], params: Dict[str, Any]) -> TranscriptionResult:
+    def sarvam_transcribe(self, audio_bytes: bytes, lang: str, api_keys: Dict[str, str], params: Dict[str, Any]) -> TranscriptionResult:
         key = api_keys.get("sarvam")
         model = params.get("sarvam_model", self.cfg.get("sarvam_model", "saarika:v2.5"))
         if not key:

@@ -12,6 +12,9 @@ from typing import List, Tuple
 
 logger = logging.getLogger(__name__)
 
+# Connection-pooled session for LLM API and Ollama calls
+_SESSION = requests.Session()
+
 
 def check_ollama_server(url: str) -> Tuple[bool, str]:
     """Ping the Ollama server to check if it is running."""
@@ -19,7 +22,7 @@ def check_ollama_server(url: str) -> Tuple[bool, str]:
         # Strip trailing slashes to avoid double-slash issues
         url = url.rstrip("/")
         # Ollama root endpoint returns a simple "Ollama is running" message
-        resp = requests.get(f"{url}/", timeout=3.0)
+        resp = _SESSION.get(f"{url}/", timeout=3.0)
         if resp.status_code == 200:
             return True, "Ollama is running."
         return False, f"Server returned status {resp.status_code}."
@@ -35,7 +38,7 @@ def get_ollama_models(url: str) -> List[str]:
     """Fetch the list of installed models from the Ollama server."""
     try:
         url = url.rstrip("/")
-        resp = requests.get(f"{url}/api/tags", timeout=3.0)
+        resp = _SESSION.get(f"{url}/api/tags", timeout=3.0)
         resp.raise_for_status()
         data = resp.json()
         models = [m.get("name") for m in data.get("models", [])]
@@ -100,7 +103,7 @@ def polish_with_ollama(text: str, url: str, model: str, action: str, custom_prom
     }
 
     try:
-        resp = requests.post(api_endpoint, json=payload, timeout=timeout)
+        resp = _SESSION.post(api_endpoint, json=payload, timeout=timeout)
         resp.raise_for_status()
         result = resp.json()
         
@@ -160,7 +163,11 @@ def polish_with_gemini(text: str, api_key: str, model: str, action: str, custom_
         user_input = f"Please process the following text according to this rule: {action}.\n\nText:\n{text}"
 
     # Gemini Flash Lite supports system instructions in the request
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+    headers = {
+        "x-goog-api-key": api_key,
+        "Content-Type": "application/json"
+    }
     
     payload = {
         "contents": [{
@@ -178,7 +185,7 @@ def polish_with_gemini(text: str, api_key: str, model: str, action: str, custom_
     }
 
     try:
-        resp = requests.post(url, json=payload, timeout=60.0)
+        resp = _SESSION.post(url, headers=headers, json=payload, timeout=60.0)
         resp.raise_for_status()
         result = resp.json()
         
@@ -265,7 +272,7 @@ def polish_with_openrouter(text: str, api_key: str, model: str, action: str, cus
     }
 
     try:
-        resp = requests.post(url, json=payload, headers=headers, timeout=60.0)
+        resp = _SESSION.post(url, json=payload, headers=headers, timeout=60.0)
         resp.raise_for_status()
         result = resp.json()
         
@@ -347,7 +354,7 @@ def polish_with_groq(text: str, api_key: str, model: str, action: str, custom_pr
     }
 
     try:
-        resp = requests.post(url, json=payload, headers=headers, timeout=60.0)
+        resp = _SESSION.post(url, json=payload, headers=headers, timeout=60.0)
         resp.raise_for_status()
         result = resp.json()
         
@@ -377,7 +384,7 @@ def test_openrouter_connection(api_key: str) -> Tuple[bool, str]:
         return False, "API key missing."
     try:
         headers = {"Authorization": f"Bearer {api_key}"}
-        resp = requests.get("https://openrouter.ai/api/v1/auth/key", headers=headers, timeout=10)
+        resp = _SESSION.get("https://openrouter.ai/api/v1/auth/key", headers=headers, timeout=10)
         if resp.status_code == 200:
             return True, "OpenRouter connected successfully."
         else:
@@ -391,7 +398,7 @@ def test_groq_connection(api_key: str) -> Tuple[bool, str]:
         return False, "API key missing."
     try:
         headers = {"Authorization": f"Bearer {api_key}"}
-        resp = requests.get("https://api.groq.com/openai/v1/models", headers=headers, timeout=10)
+        resp = _SESSION.get("https://api.groq.com/openai/v1/models", headers=headers, timeout=10)
         if resp.status_code == 200:
             return True, "Groq connected successfully."
         else:

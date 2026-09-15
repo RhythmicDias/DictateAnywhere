@@ -42,11 +42,16 @@ from typing import Callable, Optional
 import numpy as np
 import sounddevice as sd
 
+from .vad import strip_silence
+
 logger = logging.getLogger(__name__)
 
 TARGET_RATE = 16_000          # Hz — Whisper / VAD requirement
 CHANNELS = 1                  # mono
 FRAME_DURATION_MS = 30        # VAD frame size (10 | 20 | 30 ms)
+
+# Cached working audio device tuple: (device_index, sample_rate, label)
+_CACHED_INPUT_DEVICE: Optional[tuple[Optional[int], int, str]] = None
 
 
 # ---------------------------------------------------------------------------
@@ -211,6 +216,12 @@ class AudioCapture:
         # ── Build a prioritised list of (device_index, rate_to_use, label) ──
         candidates: list[tuple[Optional[int], int, str]] = []
 
+        global _CACHED_INPUT_DEVICE
+        if _CACHED_INPUT_DEVICE is not None:
+            c_dev, c_rate, c_label = _CACHED_INPUT_DEVICE
+            if self._requested_device is None or self._requested_device == c_dev:
+                candidates.append((c_dev, c_rate, c_label))
+
         # 1. MME device matching the requested device name
         try:
             if self._requested_device is not None:
@@ -219,7 +230,9 @@ class AudioCapture:
                 req_name = sd.query_devices(kind="input")["name"]
             mme_match = _mme_device_for_name(req_name)
             if mme_match is not None:
-                candidates.append((mme_match, TARGET_RATE, f"MME:{mme_match}"))
+                entry = (mme_match, TARGET_RATE, f"MME:{mme_match}")
+                if entry not in candidates:
+                    candidates.append(entry)
         except Exception:
             pass
 
@@ -231,11 +244,15 @@ class AudioCapture:
 
         # 3. Requested WASAPI device at its native rate
         native = _get_device_native_rate(self._requested_device)
-        candidates.append((self._requested_device, native, f"WASAPI:{self._requested_device}"))
+        entry_wasapi = (self._requested_device, native, f"WASAPI:{self._requested_device}")
+        if entry_wasapi not in candidates:
+            candidates.append(entry_wasapi)
 
         # 4. WASAPI default at native rate
         default_native = _get_device_native_rate(None)
-        candidates.append((None, default_native, "WASAPI:default"))
+        entry_default = (None, default_native, "WASAPI:default")
+        if entry_default not in candidates:
+            candidates.append(entry_default)
 
         last_exc: Optional[Exception] = None
         for device, rate, label in candidates:
@@ -252,27 +269,19 @@ class AudioCapture:
                 )
                 self._stream.start()
                 self._working_device = device
-
-                # Quick sanity check — read a few ms and verify non-zero
-                time.sleep(0.15)
-                if not self._frame_queue.empty():
-                    sample_frame = self._frame_queue.queue[0]
-                    arr = np.frombuffer(sample_frame, dtype=np.int16)
-                    rms = float(np.sqrt(np.mean(arr.astype(np.float32) ** 2)))
-                else:
-                    rms = 0.0
+                _CACHED_INPUT_DEVICE = (device, rate, label)
 
                 logger.info(
-                    "Audio capture started — %s rate=%d rms_check=%.5f",
-                    label, rate, rms,
+                    "Audio capture started — %s rate=%d",
+                    label, rate,
                 )
-                # Accept this device even if rms=0 on the first frame;
-                # let the application decide. Only skip truly-broken devices.
                 return
 
             except Exception as exc:
                 last_exc = exc
                 logger.warning("Could not open %s: %s", label, exc)
+                if _CACHED_INPUT_DEVICE == (device, rate, label):
+                    _CACHED_INPUT_DEVICE = None
                 try:
                     if self._stream:
                         self._stream.close()
@@ -431,7 +440,8 @@ class TimedCapture:
 
         audio = self._capture.stop()  # type: ignore[union-attr]
         if audio:
-            self._on_complete(audio)
+            trimmed = strip_silence(audio)
+            self._on_complete(trimmed if trimmed else audio)
 
     @property
     def working_device(self) -> Optional[int]:
