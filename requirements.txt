@@ -1,20 +1,11 @@
-faster-whisper
-requests
-pyaudio
-keyboard
-websocket-client
-ollama
-pyttsx3
-pyperclip
-pynput
-pillow
-pyyaml
-screeninfo
-ctypes-callable
-numpy
-scipy
-sounddevice
-pyscreeze
-pywin32; platform_system == "Windows"
-comtypes; platform_system == "Windows"
-python-dotenv
+# DictateAnywhere Dependencies
+# Managed primarily via pyproject.toml (pip install -e .)
+
+sounddevice>=0.5.1
+numpy>=1.26.4
+webrtcvad-wheels>=2.0.14
+faster-whisper>=1.0.3
+azure-cognitiveservices-speech>=1.37.0
+keyring>=25.2.1
+requests>=2.32.3
+websocket-client>=1.6.0
