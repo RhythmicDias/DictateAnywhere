@@ -42,6 +42,8 @@ jobs:
     name: Build Windows Installers
     runs-on: windows-latest
     needs: test
+    permissions:
+      contents: write
 
     steps:
       - uses: actions/checkout@v4
@@ -65,7 +67,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: lts/*
           cache: npm
 
       - name: Install Rust stable
@@ -79,7 +81,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: "DictateAnywhere ${{ github.ref_name }}"
+          tagName: v__VERSION__
+          releaseName: "DictateAnywhere v__VERSION__"
+          releaseBody: "DictateAnywhere v__VERSION__ — Hybrid local voice dictation for Windows.\n\nDownload `DictateAnywhere___VERSION___x64-setup.exe` for the one-click installer (recommended) or the `.msi` package."
           releaseDraft: false
           prerelease: false
