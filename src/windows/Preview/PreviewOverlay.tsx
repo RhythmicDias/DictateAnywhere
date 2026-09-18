@@ -259,6 +259,7 @@ export default function PreviewOverlay() {
       // Show window when recording starts
       if (config.show_preview_window) {
         win.show().catch(console.error);
+        win.setAlwaysOnTop(true).catch(() => {});
       }
     } else if (state === "loading" || state === "polishing" || state === "injecting") {
       // Keep visible if already showing, but do not call win.show() to prevent popping up at startup

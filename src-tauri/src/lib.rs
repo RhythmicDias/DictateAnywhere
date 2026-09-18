@@ -123,9 +123,32 @@ fn setup_polish_hotkey(app: &AppHandle) {
     }
 }
 
+static WAKE_APP_HANDLE: std::sync::OnceLock<AppHandle> = std::sync::OnceLock::new();
+
+/// Dynamically position preview overlay at bottom-center of the primary monitor
+pub fn position_preview_window(app: &AppHandle) {
+    if let Ok(Some(monitor)) = app.primary_monitor() {
+        let screen_w = monitor.size().width;
+        let screen_h = monitor.size().height;
+        let scale_factor = monitor.scale_factor();
+        
+        if let Some(preview) = app.get_webview_window("preview") {
+            let preview_w = (480.0 * scale_factor) as u32;
+            let preview_h = (110.0 * scale_factor) as u32;
+            let _ = preview.set_size(tauri::Size::Physical(tauri::PhysicalSize::new(preview_w, preview_h)));
+            
+            let x = screen_w.saturating_sub(preview_w) / 2;
+            // Place 140px (logical) from bottom (above taskbar)
+            let y = screen_h.saturating_sub(preview_h).saturating_sub((140.0 * scale_factor) as u32);
+            
+            let _ = preview.set_position(tauri::Position::Physical(tauri::PhysicalPosition::new(x as i32, y as i32)));
+        }
+    }
+}
+
 /// Windows-only: spin up a background thread that watches for suspend/resume events
-/// via a message-only window receiving WM_POWERBROADCAST.
-/// On resume, it emits the internal "system://wake" event so the Tauri side can recover.
+/// via an unshown top-level window receiving WM_POWERBROADCAST.
+/// On resume, it triggers handle_system_wake directly so all windows and state recover.
 #[cfg(target_os = "windows")]
 fn start_power_broadcast_listener(app: AppHandle) {
     use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
@@ -136,14 +159,16 @@ fn start_power_broadcast_listener(app: AppHandle) {
     };
     use windows::core::PCWSTR;
 
-    // PBT_APMRESUMEAUTOMATIC = 0x12 — stable Win32 constant (unchanged since Win98).
-    // Defined locally to avoid depending on a specific windows-crate feature gate.
+    // PBT_APMRESUMEAUTOMATIC (0x12) = automatic wake (timer, network, etc.)
+    // PBT_APMRESUMESUSPEND (0x07)   = user-initiated wake (lid open, keypress, power button)
     const PBT_APMRESUMEAUTOMATIC: u32 = 0x0012;
+    const PBT_APMRESUMESUSPEND: u32 = 0x0007;
+
+    let _ = WAKE_APP_HANDLE.set(app);
 
     std::thread::Builder::new()
         .name("power-broadcast".into())
         .spawn(move || unsafe {
-            // Wide null-terminated class name — must outlive RegisterClassEx + CreateWindow
             let class_name: Vec<u16> = "DictateAnywhereWake\0".encode_utf16().collect();
 
             extern "system" fn wnd_proc(
@@ -152,7 +177,20 @@ fn start_power_broadcast_listener(app: AppHandle) {
                 wparam: WPARAM,
                 lparam: LPARAM,
             ) -> LRESULT {
-                // Safety: DefWindowProcW is always safe to call as a default handler
+                if msg == WM_POWERBROADCAST {
+                    let wp = wparam.0 as u32;
+                    if wp == PBT_APMRESUMEAUTOMATIC || wp == PBT_APMRESUMESUSPEND {
+                        println!("[PowerBroadcast] System resumed from sleep (wparam={:#x})", wp);
+                        if let Some(app) = WAKE_APP_HANDLE.get() {
+                            let handle = app.clone();
+                            // Debounce by 500ms and run outside of wnd_proc on Tokio runtime to allow OS display/DWM initialization
+                            tauri::async_runtime::spawn(async move {
+                                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                                handle_system_wake(&handle);
+                            });
+                        }
+                    }
+                }
                 unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
             }
 
@@ -163,44 +201,34 @@ fn start_power_broadcast_listener(app: AppHandle) {
                 lpszClassName: PCWSTR(class_name.as_ptr()),
                 ..Default::default()
             };
-            let _ = RegisterClassExW(&wc); // ignore error if already registered
+            let _ = RegisterClassExW(&wc);
 
-            // HWND_MESSAGE (-3) = message-only window (no desktop visibility)
-            let hwnd_message = HWND(-3isize as *mut core::ffi::c_void);
+            // Note: Must be a top-level window (default parent, NOT HWND_MESSAGE),
+            // because Windows does NOT broadcast WM_POWERBROADCAST to message-only windows.
+            // Leaving WS_VISIBLE unset ensures it has zero visual presence.
             let hwnd = match CreateWindowExW(
                 WINDOW_EX_STYLE::default(),
                 PCWSTR(class_name.as_ptr()),
                 PCWSTR::null(),
                 WS_OVERLAPPED,
                 0, 0, 0, 0,
-                hwnd_message,
+                HWND::default(),
                 HMENU::default(),
                 None,
                 None,
             ) {
                 Ok(h) => h,
                 Err(e) => {
-                    eprintln!("[PowerBroadcast] Failed to create message window: {:?}", e);
+                    eprintln!("[PowerBroadcast] Failed to create power listener window: {:?}", e);
                     return;
                 }
             };
 
             let mut msg = MSG::default();
             loop {
-                // GetMessageW returns BOOL; 0 = WM_QUIT, -1 = error
                 let ret = GetMessageW(&mut msg, hwnd, 0, 0);
-                match ret.0 {
-                    0 => break,  // WM_QUIT
-                    -1 => break, // error
-                    _ => {}
-                }
-
-                if msg.message == WM_POWERBROADCAST {
-                    // WPARAM for PBT_APMRESUMEAUTOMATIC == 0x12
-                    if msg.wParam.0 as u32 == PBT_APMRESUMEAUTOMATIC {
-                        println!("[PowerBroadcast] System resumed from sleep — emitting system://wake");
-                        let _ = app.emit("system://wake", ());
-                    }
+                if ret.0 <= 0 {
+                    break;
                 }
                 DispatchMessageW(&msg);
             }
@@ -214,14 +242,20 @@ fn start_power_broadcast_listener(_app: AppHandle) {
 }
 
 
-/// Called on system wake: re-shows the floating widget, re-registers hotkeys,
-/// and kicks off a sidecar restart if it died during sleep.
+/// Called on system wake: re-asserts always-on-top and positioning on preview overlay and floating widget,
+/// and emits system://wake to frontend subscribers.
 fn handle_system_wake(app: &AppHandle) {
     println!("[Wake] Recovering after sleep...");
 
-    // 1. Re-show and re-assert always-on-top on the floating widget
+    // 1. Re-assert always-on-top and position on preview overlay
+    position_preview_window(app);
+    if let Some(preview) = app.get_webview_window("preview") {
+        let _ = preview.set_always_on_top(true);
+        println!("[Wake] Preview overlay re-asserted.");
+    }
+
+    // 2. Re-show and re-assert always-on-top on floating widget (if enabled in config)
     if let Some(widget) = app.get_webview_window("floating-widget") {
-        // Read config to check if widget should be visible
         let should_show = if let Ok(cfg) = get_config() {
             cfg.get("show_floating_widget")
                 .and_then(|v| v.as_bool())
@@ -237,24 +271,20 @@ fn handle_system_wake(app: &AppHandle) {
         }
     }
 
-    // 2. Re-register hotkeys (Windows may drop them on session lock/display change)
-    // Unregister first to avoid "already registered" errors
-    {
-        use tauri_plugin_global_shortcut::GlobalShortcutExt;
-        let _ = app.global_shortcut().unregister_all();
-    }
-    setup_default_hotkey(app);
-    setup_polish_hotkey(app);
-    println!("[Wake] Hotkeys re-registered.");
+    // 3. Emit system://wake to all webviews so stores & hooks re-sync
+    let _ = app.emit("system://wake", ());
 
-    // 3. Always restart the sidecar on system wake to ensure audio capture and device states are cleanly re-initialized
-    println!("[Wake] Scheduling sidecar restart to recover audio devices...");
-    let handle = app.clone();
-    tauri::async_runtime::spawn(async move {
-        // Give the OS a moment to fully restore network/GPU/audio after resume
-        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-        restart_sidecar_internal(handle).await;
-    });
+    // 4. Check sidecar health — restart only if child process actually died during sleep
+    let state = (*app.state::<SidecarState>()).clone();
+    if !state.ready.load(std::sync::atomic::Ordering::SeqCst) {
+        println!("[Wake] Sidecar not ready — restarting sidecar...");
+        let handle = app.clone();
+        tauri::async_runtime::spawn(async move {
+            restart_sidecar_internal(handle).await;
+        });
+    } else {
+        println!("[Wake] Sidecar is healthy and running.");
+    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -393,17 +423,7 @@ pub fn run() {
                 }
 
                 // 2. Position Preview Overlay at center-bottom:
-                // Width 340, height 80.
-                if let Some(preview) = app.get_webview_window("preview") {
-                    let preview_w = (480.0 * scale_factor) as u32;
-                    let preview_h = (110.0 * scale_factor) as u32;
-                    
-                    let x = screen_w.saturating_sub(preview_w) / 2;
-                    // Place 140px (logical) from bottom (above taskbar)
-                    let y = screen_h.saturating_sub(preview_h).saturating_sub((140.0 * scale_factor) as u32);
-                    
-                    let _ = preview.set_position(tauri::Position::Physical(tauri::PhysicalPosition::new(x as i32, y as i32)));
-                }
+                position_preview_window(app.handle());
             } else {
                 // Fallback if monitor details are unavailable
                 if let Some(widget) = app.get_webview_window("floating-widget") {

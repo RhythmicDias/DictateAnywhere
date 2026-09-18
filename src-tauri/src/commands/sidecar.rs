@@ -104,8 +104,6 @@ pub fn start_sidecar_with_state(app: AppHandle, state: SidecarState) -> Result<(
                                             }
                                             "state" => {
                                                 if let Some(s) = value.get("state").and_then(|s| s.as_str()) {
-                                                    let _ = app_handle.emit("dictation://state-changed", s);
-
                                                     // Native handling: Show preview overlay window when recording starts
                                                     if s == "active" {
                                                         let show_preview = if let Ok(cfg) = super::config::get_config() {
@@ -118,9 +116,12 @@ pub fn start_sidecar_with_state(app: AppHandle, state: SidecarState) -> Result<(
                                                         if show_preview {
                                                             if let Some(preview_win) = app_handle.get_webview_window("preview") {
                                                                 let _ = preview_win.show();
+                                                                let _ = preview_win.set_always_on_top(true);
                                                             }
                                                         }
                                                     }
+
+                                                    let _ = app_handle.emit("dictation://state-changed", s);
                                                 }
                                             }
                                             "audio_level" => {

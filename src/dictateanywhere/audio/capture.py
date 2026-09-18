@@ -212,6 +212,7 @@ class AudioCapture:
             return
         self._all_frames.clear()
         self._recording = True
+        self._last_level_time = 0.0
 
         # ── Build a prioritised list of (device_index, rate_to_use, label) ──
         candidates: list[tuple[Optional[int], int, str]] = []
