@@ -83,6 +83,6 @@ jobs:
         with:
           tagName: v__VERSION__
           releaseName: "DictateAnywhere v__VERSION__"
-          releaseBody: "DictateAnywhere v__VERSION__ — Hybrid local voice dictation for Windows.\n\nDownload `DictateAnywhere___VERSION___x64-setup.exe` for the one-click installer (recommended) or the `.msi` package."
+          releaseBody: "DictateAnywhere v__VERSION__ — Hybrid local voice dictation for Windows.\n\nDownload `DictateAnywhere___VERSION___x64-setup.exe` below for the one-click standalone installer."
           releaseDraft: false
           prerelease: false

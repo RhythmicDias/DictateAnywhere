@@ -81,7 +81,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["nsis"],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -90,10 +90,6 @@
       "icons/icon.ico"
     ],
     "windows": {
-      "wix": {
-        "language": "en-US",
-        "upgradeCode": "B7A2C4D6-E8F0-4A1B-9C3D-5E7F2A4B6C8D"
-      },
       "nsis": {
         "installMode": "currentUser",
         "languages": ["English"]
