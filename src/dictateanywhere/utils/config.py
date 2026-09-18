@@ -116,15 +116,12 @@ class Config:
     skipped_update_version: str = ""    # release tag the user chose to skip
 
     # ── Cloud STT Settings ────────────────────────────────────────────────────
-    sarvam_model: str = "saarika:v2.5"
-    sarvam_language: str = "hi-IN"
-    enable_sarvam_websocket: bool = True
-    
     gemini_stt_model: str = "gemini-flash-lite-latest"
     gemini_stt_language: str = "en"
 
     # ── Text Polish ───────────────────────────────────────────────────────────
     enable_polish: bool = False
+    polish_hotkey: str = "ctrl+alt+p"
     polish_provider: str = "ollama"
     polish_action: str = "Fix Grammar & Spelling"
     custom_polish_prompt: str = "Rewrite this text to be more concise."

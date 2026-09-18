@@ -7,6 +7,24 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [2.0.1] - 2026-09-18
+
+### Fixed
+- **Local Whisper Engine Cache**: Decoupled configured device (`auto`) from runtime execution device (`cuda`/`cpu`), preventing unnecessary model unloads and 3.5s reload delays on dictation completion.
+- **Config Schema Synchronization**: Added `polish_hotkey` to the backend `Config` dataclass, eliminating `Unknown config key: 'polish_hotkey'` warning.
+- **Cloud STT Timeout & Error Handling**: Reduced STT request timeout to 25s and added descriptive user guidance when slow reasoning models are selected.
+
+---
+
+## [2.0.0] - 2026-09-18
+
+### Added
+- **Tauri v2 Architecture**: Complete frontend rewrite in React + TypeScript + Tailwind CSS backed by a lightweight Rust shell and Python PyInstaller sidecar.
+- **Dynamic CUDA 12 Discovery**: Automatic detection of Ollama and venv CUDA/cuDNN libraries without bundling 1.2 GB DLLs in installer.
+- **WiX MSI & NSIS Installers**: Automated dual installer bundling via GitHub Actions.
+
+---
+
 ## [1.7.0] - 2026-06-01
 
 ### Added

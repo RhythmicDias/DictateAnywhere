@@ -51,6 +51,7 @@ class LocalEngine(STTEngine):
         # Optimize default for CUDA (RTX 5060 Tensor Cores): float16 is ~2-3x faster than int8
         if self._device == "cuda" and self._compute_type in ("int8", "auto", "default"):
             self._compute_type = "float16"
+        self._active_device = self._device
         self._model = None
         self._lock = threading.Lock()
         MODELS_DIR.mkdir(parents=True, exist_ok=True)
@@ -68,6 +69,10 @@ class LocalEngine(STTEngine):
     @property
     def device(self) -> str:
         return self._device
+
+    @property
+    def active_device(self) -> str:
+        return self._active_device
 
     @property
     def beam_size(self) -> int:
@@ -91,47 +96,53 @@ class LocalEngine(STTEngine):
             logger.info("faster-whisper version: %s", faster_whisper.__version__)
             from faster_whisper import WhisperModel
 
-            # Auto-detect CUDA capability for optimal GPU acceleration
-            if self._device == "auto":
+            # Auto-detect CUDA capability for optimal GPU acceleration without mutating self._device
+            active_device = self._device
+            active_compute = self._compute_type
+
+            if active_device == "auto":
                 try:
                     if ctranslate2.get_cuda_device_count() > 0:
-                        self._device = "cuda"
-                        if self._compute_type in ("int8", "auto", "default"):
-                            self._compute_type = "float16"
+                        active_device = "cuda"
+                        if active_compute in ("int8", "auto", "default"):
+                            active_compute = "float16"
                     else:
-                        self._device = "cpu"
+                        active_device = "cpu"
+                        if active_compute in ("auto", "default"):
+                            active_compute = "int8"
                 except Exception:
-                    pass
+                    active_device = "cpu"
+                    active_compute = "int8"
 
             logger.info(
                 "Loading faster-whisper model %r (device=%s, compute_type=%s) …",
                 self._model_size,
-                self._device,
-                self._compute_type,
+                active_device,
+                active_compute,
             )
             t0 = time.monotonic()
             
             try:
                 self._model = WhisperModel(
                     self._model_size,
-                    device=self._device,
-                    compute_type=self._compute_type,
+                    device=active_device,
+                    compute_type=active_compute,
                     download_root=str(MODELS_DIR),
                     cpu_threads=4,
                 )
+                self._active_device = active_device
             except Exception as e:
                 # Handle common float16 / CPU mismatch OR CUDA initialization failures
                 err_str = str(e).lower()
-                is_cuda_err = (self._device == "cuda") or ("cuda" in err_str) or ("cublas" in err_str) or ("cudnn" in err_str)
-                is_float16_cpu_err = ("float16" in err_str and self._device != "cuda")
+                is_cuda_err = (active_device == "cuda") or ("cuda" in err_str) or ("cublas" in err_str) or ("cudnn" in err_str)
+                is_float16_cpu_err = ("float16" in err_str and active_device != "cuda")
 
                 if is_float16_cpu_err or is_cuda_err:
                     fallback_reason = "float16 on CPU" if is_float16_cpu_err else f"Hardware acceleration failed ({e})"
                     logger.warning("%s. Falling back to int8/cpu.", fallback_reason)
-                    self._device = "cpu"
-                    self._compute_type = "int8"
+                    active_device = "cpu"
+                    active_compute = "int8"
                     try:
-                        from faster_whisper import WhisperModel
                         self._model = WhisperModel(
                             self._model_size,
                             device="cpu",
@@ -139,6 +150,7 @@ class LocalEngine(STTEngine):
                             download_root=str(MODELS_DIR),
                             cpu_threads=4,
                         )
+                        self._active_device = "cpu"
                         logger.info("Successfully fell back to CPU engine")
                     except Exception as fallback_err:
                         logger.error("Critical: Fallback to CPU also failed: %s", fallback_err)

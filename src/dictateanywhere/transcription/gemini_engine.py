@@ -126,7 +126,16 @@ class GeminiEngine(STTEngine):
                 }
             }
 
-            response = self._session.post(url, headers=headers, json=payload, timeout=60)
+            try:
+                response = self._session.post(url, headers=headers, json=payload, timeout=25)
+            except requests.exceptions.Timeout:
+                err_msg = (
+                    f"Gemini transcription timed out ({self._model}). "
+                    "Reasoning models are too slow for dictation. "
+                    "Use 'gemini-flash-lite-latest' or 'gemini-2.0-flash' for low latency."
+                )
+                logger.error("Gemini STT timeout: %s", err_msg)
+                return TranscriptionResult(text="", engine_name=self.name, error=err_msg)
             
             if response.status_code != 200:
                 msg = "Unknown Error"

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "DictateAnywhere"
-version = "2.0.0"
+version = "2.0.1"
 description = "Hybrid voice dictation for Windows — types anywhere using offline faster-whisper and Azure/Sarvam cloud backends"
 readme = "README.md"
 license = { file = "LICENSE" }
