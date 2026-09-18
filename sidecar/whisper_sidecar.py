@@ -29,59 +29,70 @@ os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["MKL_NUM_THREADS"] = "1"
 
 def _setup_nvidia_dlls():
-    """Add NVIDIA library paths from site-packages to DLL search path on Windows."""
+    """Add NVIDIA library paths from bundle and system/user sites to DLL search path on Windows."""
     if sys.platform != "win32":
         return
-    
-    # If running inside a PyInstaller bundle, add the bundle folder
+
+    added_dirs = set()
+
+    def add_dir(d: Path | str):
+        p = Path(d).resolve()
+        if p.is_dir() and str(p) not in added_dirs:
+            try:
+                os.add_dll_directory(str(p))
+                os.environ["PATH"] = str(p) + os.pathsep + os.environ.get("PATH", "")
+                added_dirs.add(str(p))
+                logger.info(f"Added NVIDIA DLL directory: {p}")
+            except Exception as e:
+                logger.debug(f"Could not add DLL dir {p}: {e}")
+
+    # 1. If running inside PyInstaller bundle, register bundle directory
     if getattr(sys, 'frozen', False):
         meipass = getattr(sys, '_MEIPASS', None)
         if meipass:
-            try:
-                os.add_dll_directory(meipass)
-                logger.info(f"Added PyInstaller bundle directory: {meipass}")
-            except Exception as e:
-                logger.warning(f"Failed to add PyInstaller bundle directory to DLL search path: {e}")
-        return
+            add_dir(meipass)
 
-    found = False
+    # 2. Check site-packages from active/system Python
     try:
         import site
-        # Search in all potential site-packages locations
-        prefixes = site.getsitepackages()
+        prefixes = []
+        if hasattr(site, "getsitepackages"):
+            prefixes.extend(site.getsitepackages())
         if hasattr(site, "getusersitepackages"):
             prefixes.append(site.getusersitepackages())
-            
+        prefixes.append(sys.prefix)
+
         for prefix in prefixes:
-            nvidia_dir = Path(prefix) / "nvidia"
-            if nvidia_dir.exists():
-                for bin_dir in nvidia_dir.glob("**/bin"):
-                    if bin_dir.is_dir():
-                        try:
-                            # os.add_dll_directory is for Python 3.8+
-                            os.add_dll_directory(str(bin_dir))
-                            # Also add to PATH for subprocesses and some DLL loaders
-                            os.environ["PATH"] = str(bin_dir) + os.pathsep + os.environ["PATH"]
-                            logger.info(f"Added NVIDIA DLL directory: {bin_dir}")
-                            found = True
-                        except Exception:
-                            pass
+            for n_dir in [Path(prefix) / "nvidia", Path(prefix) / "Lib" / "site-packages" / "nvidia"]:
+                if n_dir.exists():
+                    for bin_dir in n_dir.glob("**/bin"):
+                        if bin_dir.is_dir():
+                            add_dir(bin_dir)
     except Exception as e:
-        logger.warning(f"Failed to auto-setup NVIDIA DLL paths: {e}")
-    
-    if not found:
-        # Fallback: check if we are in a venv and look there directly
-        venv_path = Path(sys.prefix)
-        nvidia_venv = venv_path / "Lib" / "site-packages" / "nvidia"
-        if nvidia_venv.exists():
-             for bin_dir in nvidia_venv.glob("**/bin"):
-                if bin_dir.is_dir():
-                    try:
-                        os.add_dll_directory(str(bin_dir))
-                        os.environ["PATH"] = str(bin_dir) + os.pathsep + os.environ["PATH"]
-                        logger.info(f"Added NVIDIA DLL directory (venv fallback): {bin_dir}")
-                    except Exception:
-                        pass
+        logger.warning(f"Error scanning site-packages for NVIDIA DLLs: {e}")
+
+    # 3. Scan common system & application paths for cublas/cudnn (e.g. Ollama, CUDA toolkit, local projects)
+    user_home = Path.home()
+    candidate_paths = [
+        # Standard CUDA Toolkit
+        os.environ.get("CUDA_PATH", ""),
+        # Ollama bundled CUDA runtime
+        user_home / "AppData" / "Local" / "Programs" / "Ollama" / "lib" / "ollama" / "cuda_v12",
+        # Common project / venv locations
+        Path(r"D:\PythonProjects\DictateAnywhere\.venv\Lib\site-packages\nvidia\cublas\bin"),
+        Path(r"D:\PythonProjects\DictateAnywhere\.venv\Lib\site-packages\nvidia\cudnn\bin"),
+    ]
+
+    for cand in candidate_paths:
+        if not cand:
+            continue
+        p = Path(cand)
+        if p.is_dir():
+            # Check for bin subdirectory or direct dir
+            if (p / "bin").is_dir():
+                add_dir(p / "bin")
+            else:
+                add_dir(p)
 
 _setup_nvidia_dlls()
 

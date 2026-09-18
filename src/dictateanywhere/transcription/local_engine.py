@@ -180,41 +180,39 @@ class LocalEngine(STTEngine):
 
             active_beam = max(1, beam_size if beam_size is not None else self._beam_size)
             with self._lock:
-                segments, info = self._model.transcribe(  # type: ignore[union-attr]
-                    audio_array,
-                    language=lang_code,
-                    beam_size=active_beam,
-                    best_of=active_beam,
-                    temperature=0.0,
-                    # Disable internal VAD filter if it's causing issues, 
-                    # as we already have a high-quality capture-level VAD.
-                    vad_filter=False, 
-                    word_timestamps=False,
-                    condition_on_previous_text=False,
-                )
-
-                logger.info("Detected language: %s (prob: %.3f)", info.language, info.language_probability)
-
-                text_parts = []
-                logger.info("Iterating segments ...")
                 try:
+                    segments, info = self._model.transcribe(  # type: ignore[union-attr]
+                        audio_array,
+                        language=lang_code,
+                        beam_size=active_beam,
+                        best_of=active_beam,
+                        temperature=0.0,
+                        vad_filter=False, 
+                        word_timestamps=False,
+                        condition_on_previous_text=False,
+                    )
+
+                    logger.info("Detected language: %s (prob: %.3f)", info.language, info.language_probability)
+
+                    text_parts = []
+                    logger.info("Iterating segments ...")
                     for seg in segments:
                         if seg.text.strip():
                             text_parts.append(seg.text.strip())
                             logger.debug("Whisper segment: %r", seg.text)
-                except (RuntimeError, Exception) as seg_err:
-                    err_str = str(seg_err).lower()
-                    if any(x in err_str for x in ["cublas", "cuda", "cudnn", "load library"]):
-                        logger.error("CUDA error during segment iteration: %s. Forcing CPU fallback.", seg_err)
+                except (RuntimeError, Exception) as cuda_err:
+                    err_str = str(cuda_err).lower()
+                    if self._device == "cuda" or any(x in err_str for x in ["cublas", "cuda", "cudnn", "load library", "not found"]):
+                        logger.warning("CUDA/cuBLAS error during transcription: %s. Automatically falling back to CPU (int8)...", cuda_err)
                         self._device = "cpu"
                         self._compute_type = "int8"
                         self.unload()
                         if self.load():
-                            # Recursive retry with safe settings
-                            return self.transcribe(audio_bytes, language)
+                            # Recursive retry with safe CPU settings
+                            return self.transcribe(audio_bytes, language, beam_size)
                     
-                    logger.error("Error during segment iteration: %s", seg_err)
-                    raise seg_err
+                    logger.error("Transcription error: %s", cuda_err)
+                    raise cuda_err
 
             text = " ".join(text_parts).strip()
             logger.info("Transcription finished. Text length: %d", len(text))

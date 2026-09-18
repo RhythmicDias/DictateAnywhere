@@ -227,6 +227,48 @@ export default function PreviewOverlay() {
     };
   }, [wakeTrigger]);
 
+  // ── Listen to dictation errors for visible notification ────────────────────
+  useEffect(() => {
+    let active = true;
+    let unlistenError: (() => void) | null = null;
+
+    listen<string>("dictation://error", (event) => {
+      if (!active) return;
+      const errMsg = event.payload || "Unknown error";
+      setToast({
+        text: `❌ ${errMsg}`,
+        color: "#f38ba8",
+      });
+      setStatusText("Error");
+
+      const win = getCurrentWindow();
+      win.show().catch(console.error);
+
+      if (hideTimerRef.current) {
+        clearTimeout(hideTimerRef.current);
+      }
+
+      hideTimerRef.current = setTimeout(() => {
+        if (!active) return;
+        setToast(null);
+        win.hide().catch(console.error);
+      }, 7000);
+    }).then((un) => {
+      if (active) {
+        unlistenError = un;
+      } else {
+        un();
+      }
+    });
+
+    return () => {
+      active = false;
+      if (unlistenError) {
+        unlistenError();
+      }
+    };
+  }, [wakeTrigger]);
+
   // ── Watch dictation state changes for hide/show flows ──────────────────────
   useEffect(() => {
     // Determine status text based on state

@@ -1,28 +1,119 @@
-import { lazy, Suspense, useEffect } from "react";
+import { Component, useEffect, useState, type ErrorInfo, type ReactNode } from "react";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { listen } from "@tauri-apps/api/event";
 import { useHistoryStore } from "./store/historyStore";
+import FloatingWidget from "./windows/FloatingWidget/FloatingWidget";
+import SettingsWindow from "./windows/Settings/SettingsWindow";
+import PreviewOverlay from "./windows/Preview/PreviewOverlay";
+import HistoryWindow from "./windows/History/HistoryWindow";
 
-// Lazy-load each window component so only the relevant bundle is loaded
-// in each WebView instance. The ?window= query param routes to the right UI.
-const FloatingWidget = lazy(
-  () => import("./windows/FloatingWidget/FloatingWidget")
-);
-const SettingsWindow = lazy(
-  () => import("./windows/Settings/SettingsWindow")
-);
-const PreviewOverlay = lazy(
-  () => import("./windows/Preview/PreviewOverlay")
-);
-const HistoryWindow = lazy(
-  () => import("./windows/History/HistoryWindow")
-);
+interface ErrorBoundaryProps {
+  children: ReactNode;
+}
 
-function getWindowLabel(): string {
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error("[ErrorBoundary] Caught error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{
+          padding: "24px",
+          color: "#fdf8f5",
+          backgroundColor: "#141210",
+          fontFamily: "system-ui, sans-serif",
+          height: "100vh",
+          boxSizing: "border-box",
+          overflow: "auto"
+        }}>
+          <h2 style={{ color: "#f38ba8", margin: "0 0 12px 0" }}>⚠️ Window Render Error</h2>
+          <p style={{ color: "#bcaea3", fontSize: "14px", lineHeight: "1.5" }}>
+            DictateAnywhere encountered an unexpected error while rendering this view:
+          </p>
+          <pre style={{
+            background: "#1c1815",
+            padding: "12px",
+            borderRadius: "6px",
+            border: "1px solid rgba(255,255,255,0.1)",
+            color: "#f5b089",
+            fontSize: "12px",
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word"
+          }}>
+            {this.state.error?.message || String(this.state.error)}
+            {"\n\n"}
+            {this.state.error?.stack}
+          </pre>
+          <button
+            onClick={() => window.location.reload()}
+            style={{
+              marginTop: "12px",
+              padding: "8px 16px",
+              background: "#d97706",
+              border: "none",
+              borderRadius: "4px",
+              color: "#fff",
+              cursor: "pointer",
+              fontWeight: 600
+            }}
+          >
+            Reload Window
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+function resolveWindowLabel(): string {
+  // 1. Native Tauri window label (100% reliable within Tauri webviews)
+  try {
+    const currentWin = getCurrentWindow();
+    if (currentWin && currentWin.label) {
+      return currentWin.label;
+    }
+  } catch {
+    // Running in standalone browser
+  }
+
+  // 2. Query param ?window=...
   const params = new URLSearchParams(window.location.search);
-  return params.get("window") ?? "floating-widget";
+  const qWindow = params.get("window");
+  if (qWindow) return qWindow;
+
+  // 3. Hash #window=... or #...
+  const hash = window.location.hash.replace(/^#/, "");
+  if (hash) {
+    const hashParams = new URLSearchParams(hash);
+    const hWindow = hashParams.get("window");
+    if (hWindow) return hWindow;
+    if (["floating-widget", "settings", "preview", "history"].includes(hash)) {
+      return hash;
+    }
+  }
+
+  return "floating-widget";
 }
 
 export default function App() {
-  const windowLabel = getWindowLabel();
+  const [windowLabel] = useState<string>(() => resolveWindowLabel());
 
   useEffect(() => {
     if (windowLabel !== "floating-widget") return;
@@ -30,11 +121,10 @@ export default function App() {
     let unlistenFn: (() => void) | null = null;
 
     const setupListener = async () => {
-      const { listen } = await import("@tauri-apps/api/event");
       const unlisten = await listen<any>("dictation://transcription-result", (event) => {
         const payload = event.payload;
         if (!payload) return;
-        
+
         let text = "";
         let rawText = "";
         let polished = false;
@@ -78,12 +168,11 @@ export default function App() {
   }, [windowLabel]);
 
   return (
-    <Suspense fallback={null}>
-      {windowLabel === "floating-widget" && <FloatingWidget />}
+    <ErrorBoundary>
       {windowLabel === "settings" && <SettingsWindow />}
       {windowLabel === "preview" && <PreviewOverlay />}
       {windowLabel === "history" && <HistoryWindow />}
-      {/* main window is invisible — no UI needed */}
-    </Suspense>
+      {windowLabel === "floating-widget" && <FloatingWidget />}
+    </ErrorBoundary>
   );
 }

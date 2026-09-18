@@ -1,10 +1,21 @@
-// src-tauri/src/commands/sidecar.rs
 use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{AppHandle, Emitter, State, Manager};
 use tauri_plugin_shell::process::{CommandEvent, CommandChild};
 use tauri_plugin_shell::ShellExt;
 use serde_json::Value;
+use std::io::Write;
+
+pub fn log_to_file(msg: &str) {
+    if let Ok(appdata) = std::env::var("APPDATA") {
+        let dir = std::path::Path::new(&appdata).join("DictateAnywhere");
+        let _ = std::fs::create_dir_all(&dir);
+        let log_path = dir.join("app.log");
+        if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(log_path) {
+            let _ = writeln!(file, "{}", msg);
+        }
+    }
+}
 
 /// Application-managed sidecar state.
 ///
@@ -141,6 +152,7 @@ pub fn start_sidecar_with_state(app: AppHandle, state: SidecarState) -> Result<(
                                                     };
                                                     if let Err(e) = super::injection::inject_text(text.to_string(), method, delay).await {
                                                          eprintln!("[Rust] Text injection failed: {}", e);
+                                                         log_to_file(&format!("[Injection Error] {}", e));
                                                          let _ = app_handle.emit("dictation://error", format!("Injection failed: {}", e));
                                                      }
                                                     let _ = app_handle.emit("dictation://transcription-result", value.clone());
@@ -149,6 +161,7 @@ pub fn start_sidecar_with_state(app: AppHandle, state: SidecarState) -> Result<(
                                             "error" => {
                                                 if let Some(msg) = value.get("message").and_then(|m| m.as_str()) {
                                                     eprintln!("[Sidecar Error] {}", msg);
+                                                    log_to_file(&format!("[Sidecar Error] {}", msg));
                                                     let _ = app_handle.emit("dictation://error", msg);
                                                 }
                                             }
@@ -162,12 +175,17 @@ pub fn start_sidecar_with_state(app: AppHandle, state: SidecarState) -> Result<(
                     CommandEvent::Stderr(line_bytes) => {
                         if let Ok(s) = String::from_utf8(line_bytes) {
                             for line in s.lines() {
-                                eprintln!("[Sidecar Log] {}", line.trim());
+                                let l = line.trim();
+                                if !l.is_empty() {
+                                    eprintln!("[Sidecar Log] {}", l);
+                                    log_to_file(&format!("[Sidecar] {}", l));
+                                }
                             }
                         }
                     }
                     CommandEvent::Terminated(status) => {
                         eprintln!("[Sidecar Terminated] {:?}", status);
+                        log_to_file(&format!("[Sidecar Terminated] {:?}", status));
                         sidecar_state.ready.store(false, Ordering::SeqCst);
                         let _ = app_handle.emit("dictation://state-changed", "loading");
 
