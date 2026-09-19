@@ -30,14 +30,26 @@ import { LauncherTab } from "./tabs/LauncherTab";
 
 type TabName =
   | "engine"
+  | "cloud"
   | "audio"
+  | "polish"
   | "hotkeys"
   | "widget"
-  | "cloud"
-  | "advanced"
   | "corrections"
-  | "polish"
-  | "launcher";
+  | "launcher"
+  | "advanced";
+
+const TAB_TITLES: Record<TabName, string> = {
+  engine: "Engine",
+  cloud: "Cloud STT",
+  audio: "Audio",
+  polish: "Text Polish",
+  hotkeys: "Hotkeys",
+  widget: "Widget",
+  corrections: "Auto-Correct",
+  launcher: "App Launcher",
+  advanced: "Advanced",
+};
 
 const DEFAULT_CONFIG: Record<string, any> = {
   version: 2,
@@ -710,6 +722,15 @@ export default function SettingsWindow() {
             Engine
           </button>
           <button
+            className={`tab-btn ${activeTab === "cloud" ? "active" : ""}`}
+            onClick={() => setActiveTab("cloud")}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M17.5 19A5.5 5.5 0 0 0 18 8h-1.26a8 8 0 1 0-11.62 3.58" />
+            </svg>
+            Cloud STT
+          </button>
+          <button
             className={`tab-btn ${activeTab === "audio" ? "active" : ""}`}
             onClick={() => setActiveTab("audio")}
           >
@@ -718,6 +739,15 @@ export default function SettingsWindow() {
               <rect x="9" y="10" width="6" height="8" rx="3" />
             </svg>
             Audio
+          </button>
+          <button
+            className={`tab-btn ${activeTab === "polish" ? "active" : ""}`}
+            onClick={() => setActiveTab("polish")}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+            </svg>
+            Text Polish
           </button>
           <button
             className={`tab-btn ${activeTab === "hotkeys" ? "active" : ""}`}
@@ -737,16 +767,25 @@ export default function SettingsWindow() {
               <circle cx="12" cy="12" r="10" />
               <path d="M12 8v8M8 12h8" />
             </svg>
-            Floating Button
+            Widget
           </button>
           <button
-            className={`tab-btn ${activeTab === "cloud" ? "active" : ""}`}
-            onClick={() => setActiveTab("cloud")}
+            className={`tab-btn ${activeTab === "corrections" ? "active" : ""}`}
+            onClick={() => setActiveTab("corrections")}
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path d="M17.5 19A5.5 5.5 0 0 0 18 8h-1.26a8 8 0 1 0-11.62 3.58" />
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
             </svg>
-            Cloud STT
+            Auto-Correct
+          </button>
+          <button
+            className={`tab-btn ${activeTab === "launcher" ? "active" : ""}`}
+            onClick={() => setActiveTab("launcher")}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14 21 3" />
+            </svg>
+            App Launcher
           </button>
           <button
             className={`tab-btn ${activeTab === "advanced" ? "active" : ""}`}
@@ -758,160 +797,144 @@ export default function SettingsWindow() {
             </svg>
             Advanced
           </button>
-          <button
-            className={`tab-btn ${activeTab === "corrections" ? "active" : ""}`}
-            onClick={() => setActiveTab("corrections")}
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-            </svg>
-            Corrections
-          </button>
-          <button
-            className={`tab-btn ${activeTab === "polish" ? "active" : ""}`}
-            onClick={() => setActiveTab("polish")}
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
-            </svg>
-            Text Polish
-          </button>
-          <button
-            className={`tab-btn ${activeTab === "launcher" ? "active" : ""}`}
-            onClick={() => setActiveTab("launcher")}
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14 21 3" />
-            </svg>
-            App Launcher
-          </button>
         </div>
 
-        {/* Tab Contents */}
-        <div className="settings-content">
-          {activeTab === "engine" && (
-            <EngineTab config={config} handleFieldChange={handleFieldChange} />
-          )}
+        {/* Tab Contents Main Area */}
+        <div className="settings-main">
+          <div className="settings-header">
+            <h2 className="settings-header-title">{TAB_TITLES[activeTab]}</h2>
+            <button className="settings-close-btn" onClick={handleCancel} title="Close Settings">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M18 6 6 18M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
 
-          {activeTab === "audio" && (
-            <AudioTab
-              config={config}
-              handleFieldChange={handleFieldChange}
-              devices={devices}
-              showMicTest={showMicTest}
-              setShowMicTest={setShowMicTest}
-              startMicTest={startMicTest}
-              stopMicTest={stopMicTest}
-              micLevel={micLevel}
-              micStatus={micStatus}
-              micStatusColor={micStatusColor}
-            />
-          )}
+          <div className="settings-content">
+            {activeTab === "engine" && (
+              <EngineTab config={config} handleFieldChange={handleFieldChange} />
+            )}
 
-          {activeTab === "hotkeys" && (
-            <HotkeysTab
-              config={config}
-              handleFieldChange={handleFieldChange}
-              isRecordingHotkey={isRecordingHotkey}
-              setIsRecordingHotkey={setIsRecordingHotkey}
-              hotkeyRef={hotkeyRef}
-            />
-          )}
+            {activeTab === "cloud" && (
+              <CloudTab
+                config={config}
+                handleFieldChange={handleFieldChange}
+                geminiKey={geminiKey}
+                setGeminiKey={setGeminiKey}
+                showGeminiKey={showGeminiKey}
+                setShowGeminiKey={setShowGeminiKey}
+                testGeminiKey={testGeminiKey}
+                geminiTestStatus={geminiTestStatus}
+                azureKey={azureKey}
+                setAzureKey={setAzureKey}
+                showAzureKey={showAzureKey}
+                setShowAzureKey={setShowAzureKey}
+                testAzureKey={testAzureKey}
+                azureTestStatus={azureTestStatus}
+                sarvamKey={sarvamKey}
+                setSarvamKey={setSarvamKey}
+                showSarvamKey={showSarvamKey}
+                setShowSarvamKey={setShowSarvamKey}
+                testSarvamKey={testSarvamKey}
+                sarvamTestStatus={sarvamTestStatus}
+                openrouterKey={openrouterKey}
+                setOpenRouterKey={setOpenRouterKey}
+                showOpenRouterKey={showOpenRouterKey}
+                setShowOpenRouterKey={setShowOpenRouterKey}
+                testOpenRouterKey={testOpenRouterKey}
+                openrouterTestStatus={openrouterTestStatus}
+                groqKey={groqKey}
+                setGroqKey={setGroqKey}
+                showGroqKey={showGroqKey}
+                setShowGroqKey={setShowGroqKey}
+                testGroqKey={testGroqKey}
+                groqTestStatus={groqTestStatus}
+              />
+            )}
 
-          {activeTab === "widget" && (
-            <WidgetTab config={config} handleFieldChange={handleFieldChange} />
-          )}
+            {activeTab === "audio" && (
+              <AudioTab
+                config={config}
+                handleFieldChange={handleFieldChange}
+                devices={devices}
+                showMicTest={showMicTest}
+                setShowMicTest={setShowMicTest}
+                startMicTest={startMicTest}
+                stopMicTest={stopMicTest}
+                micLevel={micLevel}
+                micStatus={micStatus}
+                micStatusColor={micStatusColor}
+              />
+            )}
 
-          {activeTab === "cloud" && (
-            <CloudTab
-              config={config}
-              handleFieldChange={handleFieldChange}
-              geminiKey={geminiKey}
-              setGeminiKey={setGeminiKey}
-              showGeminiKey={showGeminiKey}
-              setShowGeminiKey={setShowGeminiKey}
-              testGeminiKey={testGeminiKey}
-              geminiTestStatus={geminiTestStatus}
-              azureKey={azureKey}
-              setAzureKey={setAzureKey}
-              showAzureKey={showAzureKey}
-              setShowAzureKey={setShowAzureKey}
-              testAzureKey={testAzureKey}
-              azureTestStatus={azureTestStatus}
-              sarvamKey={sarvamKey}
-              setSarvamKey={setSarvamKey}
-              showSarvamKey={showSarvamKey}
-              setShowSarvamKey={setShowSarvamKey}
-              testSarvamKey={testSarvamKey}
-              sarvamTestStatus={sarvamTestStatus}
-              openrouterKey={openrouterKey}
-              setOpenRouterKey={setOpenRouterKey}
-              showOpenRouterKey={showOpenRouterKey}
-              setShowOpenRouterKey={setShowOpenRouterKey}
-              testOpenRouterKey={testOpenRouterKey}
-              openrouterTestStatus={openrouterTestStatus}
-              groqKey={groqKey}
-              setGroqKey={setGroqKey}
-              showGroqKey={showGroqKey}
-              setShowGroqKey={setShowGroqKey}
-              testGroqKey={testGroqKey}
-              groqTestStatus={groqTestStatus}
-            />
-          )}
+            {activeTab === "polish" && (
+              <PolishTab
+                config={config}
+                handleFieldChange={handleFieldChange}
+                fetchOllamaModels={fetchOllamaModels}
+                ollamaStatus={ollamaStatus}
+                ollamaError={ollamaError}
+                ollamaModels={ollamaModels}
+              />
+            )}
 
-          {activeTab === "advanced" && (
-            <AdvancedTab
-              config={config}
-              handleFieldChange={handleFieldChange}
-              handleCheckUpdates={handleCheckUpdates}
-              updateCheckStatus={updateCheckStatus}
-              updateCheckMessage={updateCheckMessage}
-              handleOpenConfigFolder={handleOpenConfigFolder}
-              isLoadingCache={isLoadingCache}
-              cachedModels={cachedModels}
-              handleDeleteModel={handleDeleteModel}
-            />
-          )}
+            {activeTab === "hotkeys" && (
+              <HotkeysTab
+                config={config}
+                handleFieldChange={handleFieldChange}
+                isRecordingHotkey={isRecordingHotkey}
+                setIsRecordingHotkey={setIsRecordingHotkey}
+                hotkeyRef={hotkeyRef}
+                isRecordingPolishHotkey={isRecordingPolishHotkey}
+                setIsRecordingPolishHotkey={setIsRecordingPolishHotkey}
+                polishHotkeyRef={polishHotkeyRef}
+              />
+            )}
 
-          {activeTab === "corrections" && (
-            <CorrectionsTab
-              corrections={corrections}
-              newFromWord={newFromWord}
-              setNewFromWord={setNewFromWord}
-              newToWord={newToWord}
-              setNewToWord={setNewToWord}
-              addCorrection={addCorrection}
-              updateCorrectionField={updateCorrectionField}
-              removeCorrection={removeCorrection}
-            />
-          )}
+            {activeTab === "widget" && (
+              <WidgetTab config={config} handleFieldChange={handleFieldChange} />
+            )}
 
-          {activeTab === "polish" && (
-            <PolishTab
-              config={config}
-              handleFieldChange={handleFieldChange}
-              isRecordingPolishHotkey={isRecordingPolishHotkey}
-              setIsRecordingPolishHotkey={setIsRecordingPolishHotkey}
-              polishHotkeyRef={polishHotkeyRef}
-              fetchOllamaModels={fetchOllamaModels}
-              ollamaStatus={ollamaStatus}
-              ollamaError={ollamaError}
-              ollamaModels={ollamaModels}
-            />
-          )}
+            {activeTab === "corrections" && (
+              <CorrectionsTab
+                corrections={corrections}
+                newFromWord={newFromWord}
+                setNewFromWord={setNewFromWord}
+                newToWord={newToWord}
+                setNewToWord={setNewToWord}
+                addCorrection={addCorrection}
+                updateCorrectionField={updateCorrectionField}
+                removeCorrection={removeCorrection}
+              />
+            )}
 
-          {activeTab === "launcher" && (
-            <LauncherTab
-              config={config}
-              newCommandText={newCommandText}
-              setNewCommandText={setNewCommandText}
-              newCommandPath={newCommandPath}
-              setNewCommandPath={setNewCommandPath}
-              handleLauncherBrowse={handleLauncherBrowse}
-              addLauncherCommand={addLauncherCommand}
-              removeLauncherCommand={removeLauncherCommand}
-            />
-          )}
+            {activeTab === "launcher" && (
+              <LauncherTab
+                config={config}
+                newCommandText={newCommandText}
+                setNewCommandText={setNewCommandText}
+                newCommandPath={newCommandPath}
+                setNewCommandPath={setNewCommandPath}
+                handleLauncherBrowse={handleLauncherBrowse}
+                addLauncherCommand={addLauncherCommand}
+                removeLauncherCommand={removeLauncherCommand}
+              />
+            )}
+
+            {activeTab === "advanced" && (
+              <AdvancedTab
+                config={config}
+                handleFieldChange={handleFieldChange}
+                handleCheckUpdates={handleCheckUpdates}
+                updateCheckStatus={updateCheckStatus}
+                updateCheckMessage={updateCheckMessage}
+                handleOpenConfigFolder={handleOpenConfigFolder}
+                isLoadingCache={isLoadingCache}
+                cachedModels={cachedModels}
+                handleDeleteModel={handleDeleteModel}
+              />
+            )}
+          </div>
         </div>
       </div>
 

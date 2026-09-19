@@ -1,532 +1,638 @@
 /* SettingsWindow.css
- * Sleek, dark-themed, glassmorphism UI for DictateAnywhere Settings.
- * Updated to Amber & Champagne luxury theme using CSS custom properties.
+ * Modern, clean settings dialog styling inspired by sleek desktop apps.
+ * Tight spacing, compact professional fonts, grouped rounded cards,
+ * pill selectors, and smooth custom scrollbar.
+ *
+ * NOTE: Strictly scoped to .settings-root so no external window stylesheets
+ * (e.g. HistoryWindow) can leak or overwrite colors.
  */
 
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
-:root {
-  --font-family: 'Outfit', 'Segoe UI', system-ui, -apple-system, sans-serif;
-  --bg-main: #141210;
-  --bg-gradient: linear-gradient(135deg, #141210 0%, #1e1a17 100%);
-  --bg-sidebar: rgba(32, 28, 25, 0.45);
-  --bg-card: rgba(32, 28, 25, 0.6);
-  --bg-input: #0f0d0b;
-  --bg-footer: rgba(20, 18, 16, 0.85);
-  --bg-modal: #1c1815;
-  --bg-slider: #2c2722;
+.settings-root {
+  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --bg-main: #ffffff;
+  --bg-sidebar: #fafafa;
+  --bg-card: #f4f4f5;
+  --bg-card-hover: #ececee;
+  --bg-input: #ffffff;
+  --bg-footer: #ffffff;
+  --bg-modal: #ffffff;
+  --bg-pill: #e4e4e7;
+  --bg-pill-hover: #d4d4d8;
+  --bg-slider: #d4d4d8;
   
-  --border-color: rgba(255, 255, 255, 0.07);
-  --border-color-focus: #d97706;
+  --border-color: #e5e7eb;
+  --border-subtle: rgba(0, 0, 0, 0.05);
+  --border-focus: #2a8f8e;
   
-  --text-primary: #fdf8f5;
-  --text-secondary: #bcaea3;
-  --text-muted: #948b83;
+  --text-primary: #18181b;
+  --text-secondary: #52525b;
+  --text-muted: #71717a;
   
-  --accent-primary: #d97706;
-  --accent-hover: #f59e0b;
-  --accent-glow: rgba(217, 119, 6, 0.25);
-  --accent-peach: #f5b089;
+  --accent-primary: #2a8f8e;
+  --accent-hover: #237877;
+  --accent-glow: rgba(42, 143, 142, 0.18);
+  --accent-dark: #18181b;
   
-  --danger-color: #f38ba8;
-  --danger-bg: rgba(243, 139, 168, 0.1);
-  --danger-hover-bg: rgba(243, 139, 168, 0.18);
-  --danger-border: rgba(243, 139, 168, 0.2);
-  --danger-hover-border: rgba(243, 139, 168, 0.3);
+  --danger-color: #dc2626;
+  --danger-bg: #fef2f2;
+  --danger-hover-bg: #fee2e2;
+  --danger-border: #fecaca;
+
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100%;
+  background: #ffffff !important;
+  color: #18181b !important;
+  font-family: var(--font-family);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
 }
 
-* {
-  margin: 0;
-  padding: 0;
+.settings-root * {
   box-sizing: border-box;
   font-family: var(--font-family);
 }
 
-body {
-  background: var(--bg-main);
-  color: var(--text-primary);
-  overflow: hidden;
-  height: 100vh;
-}
-
-.settings-root {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  background: var(--bg-gradient);
-}
-
 /* ── Container Layout ──────────────────────────────────────────────── */
-.settings-container {
+.settings-root .settings-container {
   display: flex;
   flex: 1;
   overflow: hidden;
+  background: #ffffff !important;
   border-bottom: 1px solid var(--border-color);
 }
 
 /* ── Sidebar Styling ────────────────────────────────────────────────── */
-.settings-sidebar {
-  width: 220px;
-  background: var(--bg-sidebar);
-  backdrop-filter: blur(10px);
-  border-right: 1px solid var(--border-color);
-  padding: 16px 8px;
+.settings-root .settings-sidebar {
+  width: 195px;
+  background: var(--bg-sidebar) !important;
+  border-right: 1px solid var(--border-color) !important;
+  padding: 14px 8px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
   overflow-y: auto;
+  flex-shrink: 0;
 }
 
-.settings-sidebar h3 {
+.settings-root .settings-sidebar h3 {
   font-size: 11px;
   text-transform: uppercase;
-  color: var(--text-muted);
-  padding-left: 12px;
+  color: #9ca3af !important;
+  padding-left: 10px;
   margin-bottom: 8px;
   font-weight: 700;
-  letter-spacing: 1px;
+  letter-spacing: 0.8px;
 }
 
-.tab-btn {
+.settings-root .tab-btn {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 9px;
   width: 100%;
-  padding: 10px 14px;
-  background: transparent;
-  border: none;
+  padding: 7px 11px;
+  background: transparent !important;
+  border: none !important;
   border-radius: 8px;
-  color: var(--text-secondary);
-  font-size: 14px;
+  color: var(--text-secondary) !important;
+  font-size: 12.5px;
   font-weight: 500;
   text-align: left;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: background-color 0.12s ease, color 0.12s ease;
 }
 
-.tab-btn:hover {
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--text-primary);
-  transform: translateX(2px);
+.settings-root .tab-btn:hover {
+  background: #f4f4f5 !important;
+  color: var(--text-primary) !important;
 }
 
-.tab-btn.active {
-  background: var(--accent-glow);
-  color: var(--accent-primary);
-  box-shadow: inset 0 0 0 1px rgba(217, 119, 6, 0.2);
+.settings-root .tab-btn.active {
+  background: var(--bg-pill) !important;
+  color: var(--text-primary) !important;
+  font-weight: 600 !important;
 }
 
-.tab-btn svg {
-  width: 18px;
-  height: 18px;
+.settings-root .tab-btn svg {
+  width: 15px;
+  height: 15px;
   flex-shrink: 0;
-  stroke-width: 2;
+  stroke: currentColor;
+  stroke-width: 1.9;
 }
 
-/* ── Content Pane ──────────────────────────────────────────────────── */
-.settings-content {
+/* ── Content Area & Main Header ───────────────────────────────────── */
+.settings-root .settings-main {
   flex: 1;
-  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg-main) !important;
+  color: var(--text-primary) !important;
+}
+
+.settings-root .settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px 12px 24px;
+  background: var(--bg-main) !important;
+  flex-shrink: 0;
+}
+
+.settings-root .settings-header-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary) !important;
+  letter-spacing: -0.2px;
+  margin: 0;
+}
+
+.settings-root .settings-close-btn {
+  background: transparent !important;
+  border: none !important;
+  cursor: pointer;
+  color: var(--text-muted) !important;
+  border-radius: 6px;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.settings-root .settings-close-btn:hover {
+  background: #f4f4f5 !important;
+  color: var(--text-primary) !important;
+}
+
+.settings-root .settings-close-btn svg {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+  stroke-width: 2.2;
+}
+
+/* Hide duplicate tab-titles from individual tab components */
+.settings-root .tab-title {
+  display: none !important;
+}
+
+/* ── Content Scroll Area ───────────────────────────────────────────── */
+.settings-root .settings-content {
+  flex: 1;
+  padding: 0 24px 20px 24px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 14px;
+  background: var(--bg-main) !important;
+  color: var(--text-primary) !important;
 }
 
-.settings-content::-webkit-scrollbar {
-  width: 6px;
+.settings-root .settings-content::-webkit-scrollbar {
+  width: 5px;
 }
 
-.settings-content::-webkit-scrollbar-track {
+.settings-root .settings-content::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.settings-content::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
+.settings-root .settings-content::-webkit-scrollbar-thumb {
+  background: #d4d4d8;
   border-radius: 10px;
 }
 
-.tab-title {
-  font-size: 20px;
-  font-weight: 600;
-  color: var(--accent-peach);
-  margin-bottom: 12px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.settings-root .settings-content::-webkit-scrollbar-thumb:hover {
+  background: #a1a1aa;
 }
 
-.setting-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-}
-
-.setting-card-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text-primary);
-  border-bottom: 1px solid var(--border-color);
-  padding-bottom: 8px;
-  margin-bottom: 4px;
-}
-
-/* ── Form Controls ─────────────────────────────────────────────────── */
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.form-group label {
-  font-size: 13px;
+/* ── Section Title & Grouped Card ─────────────────────────────────── */
+.settings-root .setting-card-title {
+  font-size: 12px;
   font-weight: 500;
-  color: var(--text-secondary);
+  color: var(--text-muted) !important;
+  margin-bottom: 6px;
 }
 
-.form-group-row {
+.settings-root .setting-card {
+  background: var(--bg-card) !important;
+  border: 1px solid rgba(0, 0, 0, 0.04) !important;
+  border-radius: 14px;
+  padding: 4px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  color: var(--text-primary) !important;
+}
+
+/* ── Form Controls & Row Items ─────────────────────────────────────── */
+.settings-root .form-group-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  padding: 8px 0;
+  min-height: 38px;
+  border-bottom: 1px solid var(--border-subtle) !important;
 }
 
-.form-group-row label {
-  font-size: 13px;
+.settings-root .form-group-row:last-child {
+  border-bottom: none !important;
+}
+
+.settings-root .form-group-row label {
+  font-size: 12.5px;
   font-weight: 500;
-  color: var(--text-secondary);
+  color: var(--text-primary) !important;
 }
 
-.form-helper {
+.settings-root .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border-subtle) !important;
+}
+
+.settings-root .form-group:last-child {
+  border-bottom: none !important;
+}
+
+.settings-root .form-group label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary) !important;
+}
+
+.settings-root .form-helper {
   font-size: 11px;
-  color: var(--text-muted);
-  margin-top: 2px;
+  color: var(--text-muted) !important;
+  line-height: 1.35;
+  margin-top: 1px;
 }
 
-/* ── Inputs ────────────────────────────────────────────────────────── */
-input[type="text"],
-input[type="number"],
-input[type="password"],
-select,
-textarea {
-  background: var(--bg-input);
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  color: var(--text-primary);
-  padding: 8px 12px;
-  font-size: 13px;
+/* ── Dropdown Select Pills ─────────────────────────────────────────── */
+.settings-root select {
+  background-color: var(--bg-pill) !important;
+  border: none !important;
+  border-radius: 8px;
+  color: var(--text-primary) !important;
+  padding: 5px 26px 5px 10px;
+  font-size: 12px;
+  font-weight: 500;
   outline: none;
-  width: 100%;
-  transition: all 0.15s ease;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2371717a' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 8px center !important;
+  transition: background-color 0.12s ease, box-shadow 0.12s ease;
+  width: auto;
+  max-width: 100%;
 }
 
-input:focus,
-select:focus,
-textarea:focus {
-  border-color: var(--border-color-focus);
-  box-shadow: 0 0 0 2px var(--accent-glow);
+.settings-root select:hover {
+  background-color: var(--bg-pill-hover) !important;
 }
 
-input[disabled],
-select[disabled],
-textarea[disabled] {
+.settings-root select:focus {
+  box-shadow: 0 0 0 2px var(--accent-glow) !important;
+}
+
+.settings-root select[disabled] {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.input-with-button {
-  display: flex;
-  gap: 8px;
+/* ── Text / Number Inputs ──────────────────────────────────────────── */
+.settings-root input[type="text"],
+.settings-root input[type="number"],
+.settings-root input[type="password"],
+.settings-root textarea {
+  background: var(--bg-input) !important;
+  border: 1px solid #d4d4d8 !important;
+  border-radius: 7px;
+  color: var(--text-primary) !important;
+  padding: 5px 9px;
+  font-size: 12px;
+  outline: none;
+  width: 100%;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
 }
 
-/* ── Custom Switch Toggle ──────────────────────────────────────────── */
-.switch {
+.settings-root input:focus,
+.settings-root textarea:focus {
+  border-color: var(--border-focus) !important;
+  box-shadow: 0 0 0 2px var(--accent-glow) !important;
+}
+
+.settings-root input[disabled],
+.settings-root textarea[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.settings-root .input-with-button {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* ── Compact iOS-style Switch Toggle ──────────────────────────────── */
+.settings-root .switch {
   position: relative;
   display: inline-block;
-  width: 44px;
-  height: 24px;
+  width: 36px;
+  height: 20px;
   flex-shrink: 0;
 }
 
-.switch input {
+.settings-root .switch input {
   opacity: 0;
   width: 0;
   height: 0;
 }
 
-.slider {
+.settings-root .slider {
   position: absolute;
   cursor: pointer;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: var(--bg-slider);
-  transition: 0.25s;
-  border-radius: 24px;
+  background-color: #d4d4d8 !important;
+  transition: background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 20px;
 }
 
-.slider:before {
+.settings-root .slider:before {
   position: absolute;
   content: "";
-  height: 18px;
-  width: 18px;
-  left: 3px;
-  bottom: 3px;
-  background-color: var(--text-primary);
-  transition: 0.25s;
+  height: 16px;
+  width: 16px;
+  left: 2px;
+  bottom: 2px;
+  background-color: #ffffff !important;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   border-radius: 50%;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
 }
 
-input:checked + .slider {
-  background-color: var(--accent-primary);
+.settings-root input:checked + .slider {
+  background-color: var(--accent-primary) !important;
 }
 
-input:checked + .slider:before {
-  transform: translateX(20px);
-  background-color: var(--bg-main);
+.settings-root input:checked + .slider:before {
+  transform: translateX(16px);
 }
 
-/* ── Slider / Range styling ────────────────────────────────────────── */
-.range-container {
+/* ── Range Slider ──────────────────────────────────────────────────── */
+.settings-root .range-container {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   width: 100%;
 }
 
-.range-container input[type="range"] {
+.settings-root .range-container input[type="range"] {
   flex: 1;
-  height: 6px;
+  height: 4px;
   -webkit-appearance: none;
-  background: var(--bg-slider);
-  border-radius: 4px;
+  background: var(--bg-slider) !important;
+  border-radius: 2px;
   outline: none;
+  border: none !important;
+  padding: 0;
 }
 
-.range-container input[type="range"]::-webkit-slider-thumb {
+.settings-root .range-container input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
-  background: var(--accent-primary);
+  background: var(--accent-primary) !important;
   cursor: pointer;
-  transition: transform 0.1s;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  transition: transform 0.1s ease;
 }
 
-.range-container input[type="range"]::-webkit-slider-thumb:hover {
-  transform: scale(1.2);
+.settings-root .range-container input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
 }
 
-.range-val {
-  font-size: 13px;
+.settings-root .range-val {
+  font-size: 12px;
   font-weight: 600;
-  color: var(--accent-primary);
-  min-width: 36px;
+  color: var(--accent-primary) !important;
+  min-width: 32px;
   text-align: right;
 }
 
 /* ── Buttons ───────────────────────────────────────────────────────── */
-.btn {
+.settings-root .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 6px 12px;
-  border-radius: 4px;
+  padding: 5px 12px;
+  border-radius: 7px;
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.15s ease;
-  border: none;
+  transition: all 0.12s ease;
+  border: none !important;
   outline: none;
   white-space: nowrap;
 }
 
-.btn-primary {
-  background: var(--accent-primary);
-  color: var(--bg-main);
-  box-shadow: 0 4px 12px var(--accent-glow);
+.settings-root .btn-primary {
+  background: var(--accent-dark) !important;
+  color: #ffffff !important;
 }
 
-.btn-primary:hover {
-  background: var(--accent-hover);
-  transform: translateY(-1px);
+.settings-root .btn-primary:hover {
+  background: #27272a !important;
 }
 
-.btn-secondary {
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
+.settings-root .btn-secondary {
+  background: var(--bg-pill) !important;
+  color: var(--text-primary) !important;
 }
 
-.btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.15);
+.settings-root .btn-secondary:hover {
+  background: var(--bg-pill-hover) !important;
 }
 
-.btn-danger {
-  background: var(--danger-bg);
-  color: var(--danger-color);
-  border: 1px solid var(--danger-border);
+.settings-root .btn-danger {
+  background: var(--danger-bg) !important;
+  color: var(--danger-color) !important;
+  border: 1px solid var(--danger-border) !important;
 }
 
-.btn-danger:hover {
-  background: var(--danger-hover-bg);
-  border-color: var(--danger-hover-border);
+.settings-root .btn-danger:hover {
+  background: var(--danger-hover-bg) !important;
 }
 
-.btn-sm {
-  padding: 4px 8px;
+.settings-root .btn-sm {
+  padding: 3px 8px;
   font-size: 11px;
 }
 
-.btn:active {
+.settings-root .btn:active {
   transform: scale(0.98);
 }
 
 /* ── Footer ────────────────────────────────────────────────────────── */
-.settings-footer {
+.settings-root .settings-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 20px;
-  background: var(--bg-footer);
-  backdrop-filter: blur(10px);
-  gap: 12px;
+  padding: 10px 20px;
+  background: var(--bg-footer) !important;
+  border-top: 1px solid var(--border-color) !important;
+  gap: 10px;
+  flex-shrink: 0;
 }
 
-.footer-left {
+.settings-root .footer-left {
   display: flex;
-  gap: 8px;
+  gap: 6px;
 }
 
-.footer-right {
+.settings-root .footer-right {
   display: flex;
-  gap: 8px;
+  gap: 6px;
 }
 
-/* ── Lists / Tables (Corrections, App Launcher) ───────────────────── */
-.table-container {
-  border: 1px solid var(--border-color);
+/* ── Tables (Auto-Correct, App Launcher) ────────────────────────────── */
+.settings-root .table-container {
+  border: 1px solid var(--border-color) !important;
   border-radius: 8px;
-  background: var(--bg-input);
+  background: #ffffff !important;
   overflow: hidden;
-  max-height: 240px;
+  max-height: 200px;
   overflow-y: auto;
+  margin-top: 6px;
 }
 
-.settings-table {
+.settings-root .settings-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: 12px;
   text-align: left;
 }
 
-.settings-table th, 
-.settings-table td {
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--border-color);
+.settings-root .settings-table th, 
+.settings-root .settings-table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border-color) !important;
   vertical-align: middle;
 }
 
-.settings-table th {
-  background: rgba(255, 255, 255, 0.02);
-  color: var(--text-secondary);
+.settings-root .settings-table th {
+  background: #f4f4f5 !important;
+  color: var(--text-secondary) !important;
   font-weight: 600;
-  font-size: 12px;
+  font-size: 11px;
 }
 
-.settings-table tr:last-child td {
-  border-bottom: none;
+.settings-root .settings-table tr:last-child td {
+  border-bottom: none !important;
 }
 
-.table-input {
+.settings-root .table-input {
   background: transparent !important;
   border: none !important;
-  border-bottom: 1px dashed rgba(255, 255, 255, 0.15) !important;
+  border-bottom: 1px dashed #d4d4d8 !important;
   border-radius: 0 !important;
   padding: 2px 4px !important;
   width: 100%;
+  font-size: 12px !important;
+  color: var(--text-primary) !important;
 }
 
-.table-input:focus {
+.settings-root .table-input:focus {
   border-bottom-color: var(--accent-primary) !important;
   box-shadow: none !important;
 }
 
-.table-actions {
+.settings-root .table-actions {
   display: flex;
-  gap: 8px;
-  margin-top: 10px;
+  gap: 6px;
+  margin-top: 8px;
 }
 
 /* ── Hotkey Input capture ──────────────────────────────────────────── */
-.hotkey-capturer {
-  background: var(--bg-input);
-  border: 1px solid var(--border-color);
+.settings-root .hotkey-capturer {
+  background: #ffffff !important;
+  border: 1px solid #d4d4d8 !important;
   border-radius: 8px;
-  padding: 14px;
+  padding: 8px 12px;
   text-align: center;
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--accent-hover);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary) !important;
   letter-spacing: 0.5px;
-  min-height: 52px;
+  min-height: 38px;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: inset 0 2px 6px rgba(0,0,0,0.3);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
 }
 
-.hotkey-capturer.recording {
-  border-color: var(--danger-color);
-  color: var(--danger-color);
-  box-shadow: 0 0 8px rgba(243, 139, 168, 0.25), inset 0 2px 6px rgba(0,0,0,0.3);
+.settings-root .hotkey-capturer:hover {
+  border-color: #a1a1aa !important;
+  background: #fafafa !important;
+}
+
+.settings-root .hotkey-capturer.recording {
+  border-color: var(--danger-color) !important;
+  color: var(--danger-color) !important;
+  background: var(--danger-bg) !important;
   animation: pulse-border 1.5s infinite;
 }
 
 @keyframes pulse-border {
-  0% { border-color: rgba(243, 139, 168, 0.6); }
-  50% { border-color: rgba(243, 139, 168, 1); }
-  100% { border-color: rgba(243, 139, 168, 0.6); }
+  0% { border-color: rgba(220, 38, 38, 0.4); }
+  50% { border-color: rgba(220, 38, 38, 1); }
+  100% { border-color: rgba(220, 38, 38, 0.4); }
 }
 
 /* ── Connection Test status indicator ──────────────────────────────── */
-.connection-status {
-  font-size: 12px;
+.settings-root .connection-status {
+  font-size: 11px;
   font-weight: 500;
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-top: 4px;
+  gap: 4px;
+  margin-top: 3px;
 }
 
-.connection-status.success {
-  color: #a6e3a1;
+.settings-root .connection-status.success {
+  color: #059669 !important;
 }
 
-.connection-status.error {
-  color: var(--danger-color);
+.settings-root .connection-status.error {
+  color: var(--danger-color) !important;
 }
 
-.connection-status.testing {
-  color: var(--accent-hover);
+.settings-root .connection-status.testing {
+  color: #d97706 !important;
 }
 
 /* ── Grid/Column fields ────────────────────────────────────────────── */
-.grid-2 {
+.settings-root .grid-2 {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  gap: 12px;
 }
 
 /* ── Modal overlay for Microphone Level Meter ─────────────────────── */
@@ -536,8 +642,8 @@ input:checked + .slider:before {
   left: 0;
   width: 100vw;
   height: 100vh;
-  background: rgba(17, 17, 27, 0.7);
-  backdrop-filter: blur(8px);
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -545,22 +651,23 @@ input:checked + .slider:before {
 }
 
 .modal-content {
-  background: var(--bg-modal);
-  border: 1px solid var(--border-color);
+  background: #ffffff !important;
+  border: 1px solid #e5e7eb !important;
   border-radius: 12px;
-  padding: 24px;
-  width: 420px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  padding: 20px;
+  width: 380px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
-  animation: modal-fade-in 0.2s ease-out;
+  animation: modal-fade-in 0.15s ease-out;
+  color: #18181b !important;
 }
 
 @keyframes modal-fade-in {
   from {
-    transform: scale(0.95);
+    transform: scale(0.96);
     opacity: 0;
   }
   to {
@@ -570,27 +677,27 @@ input:checked + .slider:before {
 }
 
 .modal-content h4 {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: 8px;
+  color: #18181b !important;
+  margin-bottom: 6px;
 }
 
 .mic-meter-container {
   width: 100%;
-  height: 24px;
-  background: var(--bg-input);
+  height: 18px;
+  background: #f4f4f5 !important;
   border-radius: 6px;
-  border: 1px solid var(--border-color);
-  margin-top: 20px;
-  margin-bottom: 8px;
+  border: 1px solid #e5e7eb !important;
+  margin-top: 16px;
+  margin-bottom: 6px;
   overflow: hidden;
   position: relative;
 }
 
 .mic-meter-bar {
   height: 100%;
-  background: linear-gradient(90deg, #a6e3a1 0%, #94e2d5 100%);
+  background: linear-gradient(90deg, #10b981 0%, #06b6d4 100%);
   border-radius: 6px;
   transition: width 0.05s ease-out;
 }

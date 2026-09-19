@@ -83,10 +83,10 @@ export const CloudTab: React.FC<CloudTabProps> = ({
 
       <div className="setting-card">
         <div className="setting-card-title">Active Cloud STT Provider</div>
-        <div style={{ fontSize: "13px", color: "var(--text-muted, #94a3b8)", marginBottom: "16px" }}>
+        <div style={{ fontSize: "12px", color: "var(--text-muted, #71717a)", marginBottom: "12px" }}>
           Select which cloud provider handles speech-to-text transcription when Cloud STT mode is enabled.
         </div>
-        <div className="grid-3" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "12px" }}>
+        <div className="grid-3" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "10px" }}>
           {[
             { id: "gemini", name: "Google Gemini", desc: "Fast & Accurate (Flash)" },
             { id: "azure", name: "Microsoft Azure", desc: "Azure Cognitive Services" },
@@ -101,20 +101,20 @@ export const CloudTab: React.FC<CloudTabProps> = ({
                   handleFieldChange("cloud_fallback_provider", p.id);
                 }}
                 style={{
-                  padding: "12px 16px",
-                  borderRadius: "8px",
-                  border: isActive ? "2px solid #f97316" : "1px solid rgba(255, 255, 255, 0.1)",
-                  backgroundColor: isActive ? "rgba(249, 115, 22, 0.15)" : "rgba(255, 255, 255, 0.03)",
+                  padding: "10px 14px",
+                  borderRadius: "10px",
+                  border: isActive ? "1.5px solid var(--accent-primary, #2a8f8e)" : "1px solid #e4e4e7",
+                  backgroundColor: isActive ? "rgba(42, 143, 142, 0.08)" : "#ffffff",
                   cursor: "pointer",
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
-                  transition: "all 0.2s ease",
+                  transition: "all 0.15s ease",
                 }}
               >
                 <div>
-                  <div style={{ fontWeight: 600, color: isActive ? "#f97316" : "#e2e8f0" }}>{p.name}</div>
-                  <div style={{ fontSize: "12px", color: "#94a3b8" }}>{p.desc}</div>
+                  <div style={{ fontWeight: 600, fontSize: "13px", color: isActive ? "var(--accent-primary, #2a8f8e)" : "#18181b" }}>{p.name}</div>
+                  <div style={{ fontSize: "11px", color: "#71717a" }}>{p.desc}</div>
                 </div>
                 <label className="switch" onClick={(e) => e.stopPropagation()}>
                   <input
@@ -136,10 +136,10 @@ export const CloudTab: React.FC<CloudTabProps> = ({
       </div>
 
       <div className="setting-card">
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
           <div className="setting-card-title" style={{ margin: 0 }}>Google Gemini</div>
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <span style={{ fontSize: "13px", color: (config.cloud_provider || config.cloud_fallback_provider) === "gemini" ? "#f97316" : "#94a3b8" }}>
+            <span style={{ fontSize: "12px", fontWeight: 500, color: (config.cloud_provider || config.cloud_fallback_provider) === "gemini" ? "var(--accent-primary, #2a8f8e)" : "#71717a" }}>
               {(config.cloud_provider || config.cloud_fallback_provider) === "gemini" ? "Active" : "Activate"}
             </span>
             <label className="switch">
@@ -195,10 +195,10 @@ export const CloudTab: React.FC<CloudTabProps> = ({
       </div>
 
       <div className="setting-card">
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
           <div className="setting-card-title" style={{ margin: 0 }}>Microsoft Azure Speech</div>
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <span style={{ fontSize: "13px", color: (config.cloud_provider || config.cloud_fallback_provider) === "azure" ? "#f97316" : "#94a3b8" }}>
+            <span style={{ fontSize: "12px", fontWeight: 500, color: (config.cloud_provider || config.cloud_fallback_provider) === "azure" ? "var(--accent-primary, #2a8f8e)" : "#71717a" }}>
               {(config.cloud_provider || config.cloud_fallback_provider) === "azure" ? "Active" : "Activate"}
             </span>
             <label className="switch">
@@ -255,10 +255,10 @@ export const CloudTab: React.FC<CloudTabProps> = ({
       </div>
 
       <div className="setting-card">
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
           <div className="setting-card-title" style={{ margin: 0 }}>Sarvam AI (Indian Languages)</div>
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <span style={{ fontSize: "13px", color: (config.cloud_provider || config.cloud_fallback_provider) === "sarvam" ? "#f97316" : "#94a3b8" }}>
+            <span style={{ fontSize: "12px", fontWeight: 500, color: (config.cloud_provider || config.cloud_fallback_provider) === "sarvam" ? "var(--accent-primary, #2a8f8e)" : "#71717a" }}>
               {(config.cloud_provider || config.cloud_fallback_provider) === "sarvam" ? "Active" : "Activate"}
             </span>
             <label className="switch">

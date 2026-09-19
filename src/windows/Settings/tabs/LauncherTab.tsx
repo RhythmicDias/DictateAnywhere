@@ -26,7 +26,7 @@ export const LauncherTab: React.FC<LauncherTabProps> = ({
       <div className="tab-title">App Launcher Voice Commands</div>
       <div className="setting-card">
         <div className="setting-card-title">Voice Command Mappings</div>
-        <p style={{ fontSize: "13px", color: "#a6adc8", lineHeight: "1.4" }}>
+        <p style={{ fontSize: "12px", color: "var(--text-muted, #71717a)", lineHeight: "1.4", marginBottom: "8px" }}>
           Map specific spoken phrases to trigger opening local executables, files, folders or command scripts.
         </p>
 
@@ -73,15 +73,15 @@ export const LauncherTab: React.FC<LauncherTabProps> = ({
             <tbody>
               {!config.app_launcher_commands || Object.keys(config.app_launcher_commands).length === 0 ? (
                 <tr>
-                  <td colSpan={3} style={{ textAlign: "center", color: "#6c7086", padding: "16px" }}>
+                  <td colSpan={3} style={{ textAlign: "center", color: "var(--text-muted, #71717a)", padding: "14px" }}>
                     No launcher commands configured.
                   </td>
                 </tr>
               ) : (
                 Object.entries(config.app_launcher_commands).map(([cmd, path]) => (
                   <tr key={cmd}>
-                    <td style={{ fontWeight: 600, color: "#f9e2af" }}>{cmd}</td>
-                    <td style={{ fontFamily: "monospace", fontSize: "12px", color: "#a6adc8", wordBreak: "break-all" }}>
+                    <td style={{ fontWeight: 600, color: "var(--accent-primary, #2a8f8e)" }}>{cmd}</td>
+                    <td style={{ fontFamily: "monospace", fontSize: "11px", color: "var(--text-secondary, #52525b)", wordBreak: "break-all" }}>
                       {path as string}
                     </td>
                     <td style={{ textAlign: "center" }}>

@@ -7,6 +7,27 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [2.0.2] - 2026-09-19
+
+### Changed
+- **Settings Dialog Redesign**: Overhauled the Settings window aesthetic with compact professional typography (`Inter`), tight vertical rhythm, grouped rounded cards (`#f4f4f5`), custom pill dropdown selects with chevron icons, iOS-style switches, and a narrow custom scrollbar for long option lists.
+- **History Dialog Redesign**: Re-themed the Session History dialog with the same clean, light modern palette—featuring crisp `#ffffff` pane backgrounds, `#f4f4f5` comparison cards with header bars, pill-styled action buttons, and refined typography.
+- **Sidebar Menu Reorganization**: Reordered and renamed the sidebar navigation tabs to:
+  1. Engine
+  2. Cloud STT
+  3. Audio
+  4. Text Polish
+  5. Hotkeys
+  6. Widget *(renamed from "Floating Button")*
+  7. Auto-Correct *(renamed from "Corrections")*
+  8. App Launcher
+  9. Advanced
+- **Hotkey Relocation**: Moved the "Polish Toggle Hotkey" configuration from the Text Polish tab into the Hotkeys tab (positioned under "Overlay Opacity") for consolidated shortcut settings.
+- **Window Header**: Added a unified top-level header to the settings content area displaying the active section name alongside a top-right `✕` close button.
+- **Window CSS Scoping**: Strictly isolated styles across all windows (`.settings-root`, `.history-root`, `.preview-root`, `.widget-root`) and set window native themes to `"Light"` in Tauri config to prevent cross-window style collisions.
+
+---
+
 ## [2.0.1] - 2026-09-18
 
 ### Fixed

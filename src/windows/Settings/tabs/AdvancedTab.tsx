@@ -146,10 +146,10 @@ export const AdvancedTab: React.FC<AdvancedTabProps> = ({
 
       <div className="setting-card">
         <div className="setting-card-title">Application Configuration Folder</div>
-        <p style={{ fontSize: "13px", color: "#a6adc8", lineHeight: "1.4" }}>
+        <p style={{ fontSize: "12px", color: "var(--text-muted, #71717a)", lineHeight: "1.4" }}>
           Open the configuration directory containing the JSON configuration files, correction database, and logs.
         </p>
-        <div className="form-group" style={{ marginTop: "12px" }}>
+        <div className="form-group" style={{ marginTop: "10px" }}>
           <button className="btn btn-secondary" onClick={handleOpenConfigFolder}>
             Open Config Folder
           </button>
@@ -158,14 +158,14 @@ export const AdvancedTab: React.FC<AdvancedTabProps> = ({
 
       <div className="setting-card">
         <div className="setting-card-title">Whisper Local Model Cache</div>
-        <p style={{ fontSize: "13px", color: "#a6adc8", lineHeight: "1.4", marginBottom: "12px" }}>
+        <p style={{ fontSize: "12px", color: "var(--text-muted, #71717a)", lineHeight: "1.4", marginBottom: "10px" }}>
           These Whisper model weights are currently cached locally in your AppData directory. Deleting them frees up disk space; they will be downloaded again on next local engine launch.
         </p>
         
         {isLoadingCache ? (
-           <div style={{ fontSize: "13px", color: "orange" }}>Loading cached models...</div>
+           <div style={{ fontSize: "12px", color: "#d97706" }}>Loading cached models...</div>
         ) : cachedModels.length === 0 ? (
-           <div style={{ fontSize: "13px", color: "#6c7086" }}>No local Whisper models currently cached.</div>
+           <div style={{ fontSize: "12px", color: "var(--text-muted, #71717a)" }}>No local Whisper models currently cached.</div>
         ) : (
           <div className="table-container">
             <table className="settings-table">

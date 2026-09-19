@@ -179,7 +179,7 @@ The output installers will be generated in `src-tauri/target/release/bundle/`.
 ```
 DictateAnywhere/
 ├── src/                         ← React (TypeScript) UI Windows & Overlays
-│   ├── windows/Settings/tabs/   ← Modular settings tabs (Engine, Audio, Hotkeys, Cloud, etc.)
+│   ├── windows/Settings/tabs/   ← Modular settings tabs (Engine, Cloud STT, Audio, Text Polish, Hotkeys, Widget, Auto-Correct, App Launcher, Advanced)
 │   ├── windows/FloatingWidget/  ← Draggable floating microphone button
 │   ├── windows/PreviewOverlay/  ← Real-time transcription preview
 │   └── windows/HistoryWindow/   ← Session history viewer

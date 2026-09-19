@@ -31,7 +31,7 @@ export const CorrectionsTab: React.FC<CorrectionsTabProps> = ({
       <div className="tab-title">Word Corrections & Replacements</div>
       <div className="setting-card">
         <div className="setting-card-title">Define Word Corrections</div>
-        <p style={{ fontSize: "13px", color: "#a6adc8", lineHeight: "1.4" }}>
+        <p style={{ fontSize: "12px", color: "var(--text-muted, #71717a)", lineHeight: "1.4", marginBottom: "8px" }}>
           Define case-insensitive text replacements applied to the transcribed text. Match boundaries automatically enforce whole-word searches.
         </p>
 

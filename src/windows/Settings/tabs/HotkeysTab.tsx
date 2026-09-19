@@ -6,6 +6,9 @@ interface HotkeysTabProps {
   isRecordingHotkey: boolean;
   setIsRecordingHotkey: (rec: boolean) => void;
   hotkeyRef: React.RefObject<HTMLDivElement>;
+  isRecordingPolishHotkey: boolean;
+  setIsRecordingPolishHotkey: (rec: boolean) => void;
+  polishHotkeyRef: React.RefObject<HTMLDivElement>;
 }
 
 export const HotkeysTab: React.FC<HotkeysTabProps> = ({
@@ -14,6 +17,9 @@ export const HotkeysTab: React.FC<HotkeysTabProps> = ({
   isRecordingHotkey,
   setIsRecordingHotkey,
   hotkeyRef,
+  isRecordingPolishHotkey,
+  setIsRecordingPolishHotkey,
+  polishHotkeyRef,
 }) => {
   return (
     <>
@@ -107,6 +113,20 @@ export const HotkeysTab: React.FC<HotkeysTabProps> = ({
             </div>
           </>
         )}
+
+        <div className="form-group" style={{ marginTop: "12px" }}>
+          <label>Polish Toggle Hotkey</label>
+          <div
+            ref={polishHotkeyRef}
+            className={`hotkey-capturer ${isRecordingPolishHotkey ? "recording" : ""}`}
+            onClick={() => setIsRecordingPolishHotkey(true)}
+          >
+            {isRecordingPolishHotkey ? "Listening for keypress..." : (config.polish_hotkey || "ctrl+alt+p").toUpperCase()}
+          </div>
+          <div className="form-helper">
+            Press this global shortcut to toggle text polishing ON/OFF instantly.
+          </div>
+        </div>
       </div>
     </>
   );

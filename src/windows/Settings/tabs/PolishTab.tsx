@@ -3,9 +3,6 @@ import React from "react";
 interface PolishTabProps {
   config: Record<string, any>;
   handleFieldChange: (field: string, val: any) => void;
-  isRecordingPolishHotkey: boolean;
-  setIsRecordingPolishHotkey: (rec: boolean) => void;
-  polishHotkeyRef: React.RefObject<HTMLDivElement>;
   fetchOllamaModels: (url: string) => void;
   ollamaStatus: "idle" | "loading" | "success" | "error";
   ollamaError: string;
@@ -15,9 +12,6 @@ interface PolishTabProps {
 export const PolishTab: React.FC<PolishTabProps> = ({
   config,
   handleFieldChange,
-  isRecordingPolishHotkey,
-  setIsRecordingPolishHotkey,
-  polishHotkeyRef,
   fetchOllamaModels,
   ollamaStatus,
   ollamaError,
@@ -39,20 +33,6 @@ export const PolishTab: React.FC<PolishTabProps> = ({
             />
             <span className="slider"></span>
           </label>
-        </div>
-
-        <div className="form-group" style={{ marginTop: "12px" }}>
-          <label>Polish Toggle Hotkey</label>
-          <div
-            ref={polishHotkeyRef}
-            className={`hotkey-capturer ${isRecordingPolishHotkey ? "recording" : ""}`}
-            onClick={() => setIsRecordingPolishHotkey(true)}
-          >
-            {isRecordingPolishHotkey ? "Listening for keypress..." : (config.polish_hotkey || "ctrl+alt+p").toUpperCase()}
-          </div>
-          <div className="form-helper">
-            Press this global shortcut to toggle polishing ON/OFF instantly.
-          </div>
         </div>
 
         {config.enable_polish && (

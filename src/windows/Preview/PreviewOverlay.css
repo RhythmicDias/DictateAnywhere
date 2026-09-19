@@ -3,7 +3,7 @@
  * Updated to Amber & Champagne theme.
  */
 
-:root {
+.preview-root {
   --font-family: 'Outfit', 'Segoe UI', system-ui, -apple-system, sans-serif;
   --bg-overlay: rgba(32, 28, 25, 0.85);
   --border-color: rgba(255, 255, 255, 0.08);
@@ -26,21 +26,7 @@
   --danger-color: #f38ba8; /* Error Red */
   --danger-glow: rgba(243, 139, 168, 0.15);
   --danger-border: rgba(243, 139, 168, 0.3);
-}
 
-html, body, #root {
-  background: transparent !important;
-  margin: 0;
-  padding: 0;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-}
-
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
   user-select: none;
   -webkit-user-select: none;
   font-family: var(--font-family);

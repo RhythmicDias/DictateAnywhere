@@ -4,7 +4,7 @@
  * Updated to Amber & Champagne theme.
  */
 
-:root {
+.widget-root {
   --font-family: 'Outfit', 'Segoe UI', system-ui, -apple-system, sans-serif;
   --bg-menu: #1c1815;
   --border-color: rgba(255, 255, 255, 0.08);
@@ -14,15 +14,11 @@
   --accent-glow: rgba(217, 119, 6, 0.15);
   --danger-color: #f38ba8;
   --danger-glow: rgba(243, 139, 168, 0.15);
-}
 
-/* Reset — remove any body margin so the SVG sits flush */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
   user-select: none;
   -webkit-user-select: none;
+  box-sizing: border-box;
+  font-family: var(--font-family);
 }
 
 html, body, #root {
