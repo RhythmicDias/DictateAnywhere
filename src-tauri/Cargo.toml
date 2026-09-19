@@ -1,6 +1,6 @@
 [package]
 name = "dictateanywhere"
-version = "2.0.2"
+version = "2.0.3"
 description = "Hybrid voice dictation for Windows — Tauri v2 edition"
 authors = ["DictateAnywhere Contributors"]
 edition = "2021"

@@ -22,6 +22,8 @@ pub struct AppConfig {
     pub enable_sarvam_websocket: bool,
     pub gemini_stt_model: String,
     pub gemini_stt_language: String,
+    pub openrouter_stt_model: String,
+    pub groq_stt_model: String,
 
     // Audio
     pub mic_device_index: i32,
@@ -109,6 +111,8 @@ impl Default for AppConfig {
             enable_sarvam_websocket: true,
             gemini_stt_model: "gemini-flash-lite-latest".into(),
             gemini_stt_language: "en".into(),
+            openrouter_stt_model: "openai/whisper-1".into(),
+            groq_stt_model: "whisper-large-v3-turbo".into(),
             mic_device_index: -1,
             sample_rate: 16000,
             vad_aggressiveness: 1,

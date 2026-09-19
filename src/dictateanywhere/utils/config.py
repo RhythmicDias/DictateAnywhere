@@ -97,9 +97,9 @@ class Config:
     check_updates: bool = True
 
     # ── Cloud fallback & STT Provider ─────────────────────────────────────────
-    cloud_provider: str = "azure"          # azure | gemini | sarvam (active cloud provider)
+    cloud_provider: str = "azure"          # azure | gemini | sarvam | groq | openrouter (active cloud provider)
     cloud_fallback_on_error: bool = True  # fall back to cloud if local fails
-    cloud_fallback_provider: str = "azure" # azure | gemini | sarvam
+    cloud_fallback_provider: str = "azure" # azure | gemini | sarvam | groq | openrouter
     local_fallback_on_cloud_error: bool = True
 
     # ── UI theme ──────────────────────────────────────────────────────────────
@@ -118,6 +118,8 @@ class Config:
     # ── Cloud STT Settings ────────────────────────────────────────────────────
     gemini_stt_model: str = "gemini-flash-lite-latest"
     gemini_stt_language: str = "en"
+    openrouter_stt_model: str = "openai/whisper-1"
+    groq_stt_model: str = "whisper-large-v3-turbo"
 
     # ── Text Polish ───────────────────────────────────────────────────────────
     enable_polish: bool = False

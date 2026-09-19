@@ -7,6 +7,17 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [2.0.3] - 2026-09-19
+
+### Added
+- **Groq Cloud STT Integration**: Added ultra-fast Whisper speech-to-text powered by Groq Cloud (`whisper-large-v3-turbo`, `whisper-large-v3`, and `distil-whisper-large-v3-en`) to the Active Cloud STT providers and hybrid fallback options.
+- **OpenRouter Cloud STT Integration**: Added OpenRouter speech-to-text / audio transcription API support (`openai/whisper-1` and custom models) to the Active Cloud STT providers and hybrid fallback options.
+- **Active Cloud STT Provider Boxes**: Added selection cards for Groq Cloud and OpenRouter to the top provider selector grid in Cloud STT settings with active toggle switches.
+- **Dedicated STT Model Selectors**: Added configurable STT model fields and toggle headers in the OpenRouter and Groq settings cards.
+- **Backend Transcription Engines**: Implemented `GroqEngine` and `OpenRouterEngine` in `src/dictateanywhere/transcription/` and wired them into the sidecar transcription pipeline (`whisper_sidecar.py`).
+
+---
+
 ## [2.0.2] - 2026-09-19
 
 ### Changed

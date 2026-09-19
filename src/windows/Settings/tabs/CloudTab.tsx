@@ -91,6 +91,8 @@ export const CloudTab: React.FC<CloudTabProps> = ({
             { id: "gemini", name: "Google Gemini", desc: "Fast & Accurate (Flash)" },
             { id: "azure", name: "Microsoft Azure", desc: "Azure Cognitive Services" },
             { id: "sarvam", name: "Sarvam AI", desc: "Indian Languages" },
+            { id: "openrouter", name: "OpenRouter", desc: "Multi-Model Cloud STT" },
+            { id: "groq", name: "Groq Cloud", desc: "Ultra-Fast Whisper STT" },
           ].map((p) => {
             const isActive = (config.cloud_provider || config.cloud_fallback_provider || "azure") === p.id;
             return (
@@ -349,7 +351,27 @@ export const CloudTab: React.FC<CloudTabProps> = ({
       </div>
 
       <div className="setting-card">
-        <div className="setting-card-title">OpenRouter</div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+          <div className="setting-card-title" style={{ margin: 0 }}>OpenRouter</div>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <span style={{ fontSize: "12px", fontWeight: 500, color: (config.cloud_provider || config.cloud_fallback_provider) === "openrouter" ? "var(--accent-primary, #2a8f8e)" : "#71717a" }}>
+              {(config.cloud_provider || config.cloud_fallback_provider) === "openrouter" ? "Active" : "Activate"}
+            </span>
+            <label className="switch">
+              <input
+                type="checkbox"
+                checked={(config.cloud_provider || config.cloud_fallback_provider) === "openrouter"}
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    handleFieldChange("cloud_provider", "openrouter");
+                    handleFieldChange("cloud_fallback_provider", "openrouter");
+                  }
+                }}
+              />
+              <span className="slider"></span>
+            </label>
+          </div>
+        </div>
         <div className="form-group">
           <label htmlFor="openrouter_key">OpenRouter API Key</label>
           <div className="input-with-button">
@@ -375,10 +397,41 @@ export const CloudTab: React.FC<CloudTabProps> = ({
             </div>
           )}
         </div>
+
+        <div className="form-group">
+          <label htmlFor="openrouter_stt_model">OpenRouter Model</label>
+          <input
+            type="text"
+            id="openrouter_stt_model"
+            placeholder="openai/whisper-1"
+            value={config.openrouter_stt_model || ""}
+            onChange={(e) => handleFieldChange("openrouter_stt_model", e.target.value)}
+          />
+        </div>
       </div>
 
       <div className="setting-card">
-        <div className="setting-card-title">Groq API</div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+          <div className="setting-card-title" style={{ margin: 0 }}>Groq Cloud</div>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <span style={{ fontSize: "12px", fontWeight: 500, color: (config.cloud_provider || config.cloud_fallback_provider) === "groq" ? "var(--accent-primary, #2a8f8e)" : "#71717a" }}>
+              {(config.cloud_provider || config.cloud_fallback_provider) === "groq" ? "Active" : "Activate"}
+            </span>
+            <label className="switch">
+              <input
+                type="checkbox"
+                checked={(config.cloud_provider || config.cloud_fallback_provider) === "groq"}
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    handleFieldChange("cloud_provider", "groq");
+                    handleFieldChange("cloud_fallback_provider", "groq");
+                  }
+                }}
+              />
+              <span className="slider"></span>
+            </label>
+          </div>
+        </div>
         <div className="form-group">
           <label htmlFor="groq_key">Groq API Key</label>
           <div className="input-with-button">
@@ -403,6 +456,17 @@ export const CloudTab: React.FC<CloudTabProps> = ({
               {groqTestStatus === "error" && "✗ Verification failed."}
             </div>
           )}
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="groq_stt_model">Groq Model</label>
+          <input
+            type="text"
+            id="groq_stt_model"
+            placeholder="whisper-large-v3-turbo"
+            value={config.groq_stt_model || ""}
+            onChange={(e) => handleFieldChange("groq_stt_model", e.target.value)}
+          />
         </div>
       </div>
     </>

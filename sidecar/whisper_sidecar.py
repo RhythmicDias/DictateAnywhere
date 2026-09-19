@@ -109,6 +109,8 @@ from dictateanywhere.transcription.local_engine import LocalEngine
 from dictateanywhere.transcription.cloud_engine import CloudEngine
 from dictateanywhere.transcription.sarvam_engine import SarvamEngine
 from dictateanywhere.transcription.gemini_engine import GeminiEngine
+from dictateanywhere.transcription.groq_engine import GroqEngine
+from dictateanywhere.transcription.openrouter_engine import OpenRouterEngine
 from dictateanywhere.transcription.engine import TranscriptionResult
 from dictateanywhere.core.punctuation import process as process_text, clean_whisper_artifacts
 from dictateanywhere.core.corrections import CorrectionsManager
@@ -138,6 +140,8 @@ class SidecarRunner:
         self.cloud_engine: Optional[CloudEngine] = None
         self.sarvam_engine: Optional[SarvamEngine] = None
         self.gemini_engine: Optional[GeminiEngine] = None
+        self.groq_engine: Optional[GroqEngine] = None
+        self.openrouter_engine: Optional[OpenRouterEngine] = None
 
     def preload_local_engine(self, params: Optional[Dict[str, Any]] = None) -> None:
         """Pre-load the local engine in a background thread."""
@@ -440,6 +444,12 @@ class SidecarRunner:
         if mode == "sarvam":
             return self.sarvam_transcribe(audio_bytes, lang, api_keys, params)
 
+        if mode == "groq":
+            return self.groq_transcribe(audio_bytes, lang, api_keys, params)
+
+        if mode == "openrouter":
+            return self.openrouter_transcribe(audio_bytes, lang, api_keys, params)
+
         if mode == "cloud":
             provider = self._resolve_cloud_provider(params)
             logger.info(f"Cloud mode active — routing to {provider} cloud STT engine")
@@ -447,6 +457,10 @@ class SidecarRunner:
                 return self.gemini_transcribe(audio_bytes, lang, api_keys, params)
             elif provider == "sarvam":
                 return self.sarvam_transcribe(audio_bytes, lang, api_keys, params)
+            elif provider == "groq":
+                return self.groq_transcribe(audio_bytes, lang, api_keys, params)
+            elif provider == "openrouter":
+                return self.openrouter_transcribe(audio_bytes, lang, api_keys, params)
             else:
                 return self.cloud_transcribe(audio_bytes, lang, api_keys, params)
 
@@ -462,6 +476,10 @@ class SidecarRunner:
                 res = self.gemini_transcribe(audio_bytes, lang, api_keys, params)
             elif provider == "sarvam":
                 res = self.sarvam_transcribe(audio_bytes, lang, api_keys, params)
+            elif provider == "groq":
+                res = self.groq_transcribe(audio_bytes, lang, api_keys, params)
+            elif provider == "openrouter":
+                res = self.openrouter_transcribe(audio_bytes, lang, api_keys, params)
             else:
                 res = self.cloud_transcribe(audio_bytes, lang, api_keys, params)
         return res
@@ -539,6 +557,36 @@ class SidecarRunner:
             self.sarvam_engine._language = lang
 
         return self.sarvam_engine.transcribe(audio_bytes, language=lang)
+
+    def groq_transcribe(self, audio_bytes: bytes, lang: str, api_keys: Dict[str, str], params: Dict[str, Any]) -> TranscriptionResult:
+        key = api_keys.get("groq")
+        model = params.get("groq_stt_model", self.cfg.get("groq_stt_model", "whisper-large-v3-turbo"))
+        if not key:
+            return TranscriptionResult(text="", engine_name="groq", error="Groq API key missing")
+
+        if not self.groq_engine:
+            self.groq_engine = GroqEngine(api_key=key, model=model, language=lang)
+        else:
+            self.groq_engine.update_credentials(key)
+            self.groq_engine._model = model
+            self.groq_engine._language = lang
+
+        return self.groq_engine.transcribe(audio_bytes, language=lang)
+
+    def openrouter_transcribe(self, audio_bytes: bytes, lang: str, api_keys: Dict[str, str], params: Dict[str, Any]) -> TranscriptionResult:
+        key = api_keys.get("openrouter")
+        model = params.get("openrouter_stt_model", self.cfg.get("openrouter_stt_model", "openai/whisper-1"))
+        if not key:
+            return TranscriptionResult(text="", engine_name="openrouter", error="OpenRouter API key missing")
+
+        if not self.openrouter_engine:
+            self.openrouter_engine = OpenRouterEngine(api_key=key, model=model, language=lang)
+        else:
+            self.openrouter_engine.update_credentials(key)
+            self.openrouter_engine._model = model
+            self.openrouter_engine._language = lang
+
+        return self.openrouter_engine.transcribe(audio_bytes, language=lang)
 
 def main():
     if "--list-devices" in sys.argv:

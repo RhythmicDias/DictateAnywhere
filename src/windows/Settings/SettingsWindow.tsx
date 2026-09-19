@@ -102,6 +102,8 @@ const DEFAULT_CONFIG: Record<string, any> = {
 
   gemini_stt_model: "gemini-flash-lite-latest",
   gemini_stt_language: "en",
+  openrouter_stt_model: "openai/whisper-1",
+  groq_stt_model: "whisper-large-v3-turbo",
 
   enable_polish: false,
   polish_provider: "ollama",

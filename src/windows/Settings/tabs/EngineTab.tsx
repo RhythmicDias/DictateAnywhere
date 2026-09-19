@@ -19,7 +19,7 @@ export const EngineTab: React.FC<EngineTabProps> = ({ config, handleFieldChange 
             onChange={(e) => handleFieldChange("engine_mode", e.target.value)}
           >
             <option value="local">Local (Whisper GPU/CPU)</option>
-            <option value="cloud">Cloud (Azure/Gemini/Sarvam)</option>
+            <option value="cloud">Cloud (Azure/Gemini/Sarvam/Groq/OpenRouter)</option>
             <option value="hybrid">Hybrid (Local with Cloud Fallback)</option>
           </select>
           <div className="form-helper">
@@ -64,6 +64,8 @@ export const EngineTab: React.FC<EngineTabProps> = ({ config, handleFieldChange 
               <option value="azure">Azure Speech Services</option>
               <option value="gemini">Google Gemini Flash</option>
               <option value="sarvam">Sarvam AI (Indian Languages)</option>
+              <option value="groq">Groq Cloud (Ultra-Fast Whisper)</option>
+              <option value="openrouter">OpenRouter (Multi-Model STT)</option>
             </select>
           </div>
         )}
