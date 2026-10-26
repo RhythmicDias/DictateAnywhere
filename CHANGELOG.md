@@ -7,6 +7,23 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [2.0.4] - 2026-10-26
+
+### Added
+- **Multi-Language Translation**: Added a dedicated **Translation** section in the **Text Polish** tab with an on/off toggle (`enable_translation`) and a **Target Language** selector supporting 105+ languages via Ollama, Google Gemini, OpenRouter, or Groq.
+- **Translation Language Script Selector**: Added a **Translation Language Script** dropdown (`translation_script`) supporting 35+ writing scripts (e.g., *Kannada*, *Devanagari*, *Latin / Romanized*, *Malayalam*, *Tamil*, *Telugu*, *Arabic / Perso-Arabic*, *Cyrillic*), allowing translated output to be rendered in a specific script while preserving target-language vocabulary and grammar (e.g., Mangalorean Konkani in Kannada script).
+- **Floating Widget Live Appearance Preview**: Adjusting **Widget Diameter** (`32px–128px`) or **Widget Idle Opacity** in Settings now resizes and updates the floating widget in real time (and reverts if canceled).
+- **Unclipped Floating Widget Context Menu**: Right-clicking the floating mic button now dynamically expands the transparent window via atomic Win32 `SetWindowPos` so the custom dark context menu renders cleanly without clipping at any widget size.
+
+### Changed
+- **Compact Dictation Preview Overlay**: Reduced the floating preview pill dimensions to a sleek `216×36px` (`280×90` window bounds) with proportionally scaled buttons and equalizer bars.
+
+### Fixed
+- **Floating Widget Transparency & Corner Clipping**: Removed global `body` margin/flex leaks and outer SVG blur filters that bled into the window's rectangular bounds, ensuring 100% transparent corners and crisp circular geometry at all sizes.
+- **Floating Widget Click vs. Drag Separation**: Added a `4px` drag movement threshold and disabled Win32 `WS_THICKFRAME` resize borders (`"resizable": false`) to prevent accidental edge-stretching or click swallowing.
+
+---
+
 ## [2.0.3] - 2026-09-19
 
 ### Added

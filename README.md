@@ -5,7 +5,7 @@
   # DictateAnywhere
 
   **High-performance, privacy-first hybrid voice dictation for Windows and macOS.**  
-  Injects transcribed text directly at your cursor in any active application using offline local `faster-whisper` (GPU/CPU) or active Cloud STT engines (Google Gemini, Microsoft Azure, Sarvam AI).
+  Injects transcribed text directly at your cursor in any active application using offline local `faster-whisper` (GPU/CPU) or active Cloud STT engines (Google Gemini, Groq Cloud, OpenRouter, Microsoft Azure, Sarvam AI).
 
   ![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)
   ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS-blue?style=flat-square)
@@ -34,11 +34,14 @@ Designed for doctors, writers, coders, and power users, DictateAnywhere combines
 | **Smart Silence Stripping** | Integrated VAD pre-trimming with safety padding eliminates dead air and prevents Whisper repetition or hallucination loops. |
 | **NVIDIA GPU Acceleration** | Full CUDA Tensor Core optimization (automatic `float16` selection for RTX 5060, 40-series, and 30-series GPUs) with graceful CPU fallback. |
 | **Hybrid STT Architecture** | Offline `faster-whisper` (GPU/CPU) with automatic cloud fallback on error. |
-| **Active Cloud STT Selector** | Switch between **Google Gemini Flash**, **Microsoft Azure Speech**, or **Sarvam AI** with one click. |
+| **Active Cloud STT Selector** | Switch between **Google Gemini Flash**, **Groq Cloud**, **OpenRouter**, **Microsoft Azure Speech**, or **Sarvam AI** with one click. |
 | **Disfluency & Filler Removal** | Automatically purges hesitation sounds ("um", "uh", "hmm", "ah", "er") across all engines. |
-| **AI Text Polishing** | Real-time LLM refinement via local **Ollama** or cloud models (**Google Gemini**, **OpenRouter**, **Groq**). Fix grammar, format, or apply custom prompts on the fly. |
+| **AI Text Polishing** | Real-time LLM refinement via local **Ollama** or cloud models (**Google Gemini**, **OpenRouter**, **Groq**). Fix grammar, make professional, summarize, bulletize, chat, or apply custom prompts on the fly. |
+| **Multi-Language Translation & Script Control** | Translate dictated speech into **105+ target languages** and optionally override the output **writing script** across **35+ scripts** (e.g., Mangalorean Konkani written in Kannada script, or Romanized/Latin transliteration) using your selected Polish Provider. |
 | **HTTP Connection Pooling** | Persistent keep-alive sessions eliminate TCP/TLS handshake latency on cloud STT and LLM polish requests. |
-| **Floating Mic Button** | Draggable, always-on-top toggle widget with recording state indicators and countdown sweep ring. |
+| **Floating Mic Widget** | Truly transparent, draggable, always-on-top circular mic button with live resize (`32px–128px`) and opacity preview, countdown sweep ring, and an unclipped dark right-click context menu. |
+| **Compact Preview Overlay** | Sleek `216×36px` floating pill overlay with a 15-bar symmetrical live audio equalizer, status indicators, and polish/error toast notifications. |
+| **Sleep / Wake Recovery** | Native Windows `WM_POWERBROADCAST` listener automatically restores always-on-top overlays and verifies sidecar health upon system resume. |
 | **Global Hotkeys** | Fully customizable keyboard shortcuts for dictation (default `Ctrl+Alt+D` / `Cmd+Alt+D`) and LLM polishing (`Ctrl+Alt+P`). |
 | **Hardened Security** | Native Win32 asynchronous file dialogs via `rfd`, strict Tauri Content Security Policy (CSP), and header-authenticated API keys (`x-goog-api-key`). |
 | **Spoken Punctuation** | Natural voice command conversions ("period" → `.`, "comma" → `,`, "new paragraph" → `↵↵`, etc.). |
@@ -61,11 +64,12 @@ Designed for doctors, writers, coders, and power users, DictateAnywhere combines
 
 | Action | Control |
 |---|---|
-| **Toggle Dictation** | Press `Ctrl+Alt+D` (or click Floating Mic Button) |
+| **Toggle Dictation** | Press `Ctrl+Alt+D` (or left-click Floating Mic Button) |
+| **Floating Widget Menu** | Right-click Floating Mic Button → **Start/Stop, Preview, History, Settings, Quit** |
 | **Toggle Text Polish** | Press `Ctrl+Alt+P` |
-| **Open Settings** | Right-click system tray icon → **Settings** |
-| **View History** | Right-click system tray icon → **Session History** |
-| **Move Floating Widget** | Click and drag the floating mic button anywhere |
+| **Open Settings** | Right-click system tray icon or floating widget → **Settings…** |
+| **View History** | Right-click system tray icon or floating widget → **Session History…** |
+| **Move Floating Widget** | Left-click and drag the floating mic button anywhere |
 
 ### Spoken Punctuation Commands
 
@@ -101,6 +105,24 @@ DictateAnywhere allows seamless selection of your preferred cloud STT provider u
 - Specialized for Indian languages and accents (Hindi, Tamil, Telugu, Kannada, Malayalam, Marathi, Bengali, Gujarati).
 - Obtain an API key from [Sarvam AI](https://www.sarvam.ai/).
 - Supports both standard REST audio transcription and real-time WebSocket streaming.
+
+### 4. Groq Cloud (Ultra-Fast Whisper)
+- Blazing-fast cloud Whisper inference (`whisper-large-v3-turbo`, `whisper-large-v3`, `distil-whisper-large-v3-en`).
+- Get an API key from [Groq Console](https://console.groq.com/) and configure it under **Settings → Cloud STT**.
+
+### 5. OpenRouter (Multi-Model STT & LLM)
+- Unified API access to `openai/whisper-1` and multi-provider LLMs for both transcription and text polishing/translation.
+- Get an API key from [OpenRouter](https://openrouter.ai/) and configure it under **Settings → Cloud STT**.
+
+---
+
+## AI Text Polishing, Translation & Script Control
+
+Under **Settings → Text Polish**, DictateAnywhere can route transcriptions through **Ollama (Local LLM)**, **Google Gemini**, **OpenRouter**, or **Groq**:
+
+- **Refinement Actions**: *Fix Grammar & Spelling*, *Make Professional*, *Summarize*, *Create Bullet Points*, *Chat*, or *Use Custom Prompt*.
+- **Translation**: Toggle **Enable Translation** to translate dictated speech into any of **105+ target languages** before text injection. Can be used standalone or combined with any Refinement Action.
+- **Translation Language Script**: Choose **Default (Native Script)** or override the output writing system across **35+ scripts** (e.g., *Kannada*, *Devanagari*, *Latin / Romanized*, *Malayalam*, *Tamil*, *Telugu*, *Arabic / Perso-Arabic*, *Cyrillic*) — ideal for regional languages and cross-script transliteration such as **Mangalorean Konkani in Kannada script**.
 
 ---
 
@@ -180,9 +202,9 @@ The output installers will be generated in `src-tauri/target/release/bundle/`.
 DictateAnywhere/
 ├── src/                         ← React (TypeScript) UI Windows & Overlays
 │   ├── windows/Settings/tabs/   ← Modular settings tabs (Engine, Cloud STT, Audio, Text Polish, Hotkeys, Widget, Auto-Correct, App Launcher, Advanced)
-│   ├── windows/FloatingWidget/  ← Draggable floating microphone button
-│   ├── windows/PreviewOverlay/  ← Real-time transcription preview
-│   └── windows/HistoryWindow/   ← Session history viewer
+│   ├── windows/FloatingWidget/  ← Transparent draggable floating microphone button & context menu
+│   ├── windows/Preview/         ← Compact real-time audio equalizer & status overlay
+│   └── windows/History/         ← Split-pane session history & diff viewer
 ├── src-tauri/                   ← Rust Core (Tauri v2, Win32 SendInput, Keyring, Hotkeys, RFD)
 │   ├── binaries/                ← Platform sidecar binaries (whisper_sidecar-*.exe)
 │   ├── src/                     ← Rust backend commands & state
@@ -192,8 +214,8 @@ DictateAnywhere/
 │   └── whisper_sidecar.spec     ← PyInstaller spec with hardened excludes
 ├── src/dictateanywhere/         ← Lean Python STT & Core Engine
 │   ├── audio/                   ← Low-latency audio capture & WebRTC VAD silence stripping
-│   ├── transcription/           ← local_engine (FP16 CUDA faster-whisper), gemini, azure, sarvam
-│   ├── core/                    ← punctuation normalization, corrections, LLM text polish
+│   ├── transcription/           ← local_engine (CUDA faster-whisper), gemini, groq, openrouter, azure, sarvam
+│   ├── core/                    ← punctuation normalization, corrections, LLM text polish & translation
 │   └── utils/                   ← configuration manager & credentials
 ├── tests/                       ← Pytest test suite
 ├── RUN.bat                      ← 1-Click developer launch script
