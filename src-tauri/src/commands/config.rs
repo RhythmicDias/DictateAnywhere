@@ -4,8 +4,183 @@
 //! existing user configs load without migration.
 
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicI32, Ordering};
 use serde_json::Value;
-use tauri::{command, AppHandle, Manager};
+use tauri::{command, AppHandle, Emitter, Manager, WebviewWindow};
+
+#[derive(Default)]
+pub struct WidgetMenuState {
+    pub offset_x: AtomicI32,
+    pub offset_y: AtomicI32,
+}
+
+fn set_widget_bounds(widget: &WebviewWindow, x: i32, y: i32, w: u32, h: u32) {
+    #[cfg(target_os = "windows")]
+    if let Ok(hwnd) = widget.hwnd() {
+        use windows::Win32::Foundation::HWND;
+        use windows::Win32::UI::WindowsAndMessaging::{
+            SetWindowPos, SWP_NOACTIVATE, SWP_NOZORDER,
+        };
+        unsafe {
+            let _ = SetWindowPos(
+                HWND(hwnd.0),
+                None,
+                x,
+                y,
+                w as i32,
+                h as i32,
+                SWP_NOZORDER | SWP_NOACTIVATE,
+            );
+        }
+        return;
+    }
+
+    let _ = widget.set_position(tauri::Position::Physical(tauri::PhysicalPosition::new(x, y)));
+    let _ = widget.set_size(tauri::Size::Physical(tauri::PhysicalSize::new(w, h)));
+}
+
+pub fn apply_widget_config_internal(app: &AppHandle, config: &Value) {
+    if let Some(widget) = app.get_webview_window("floating-widget") {
+        let menu_state = app.state::<WidgetMenuState>();
+        let prev_ox = menu_state.offset_x.swap(0, Ordering::SeqCst);
+        let prev_oy = menu_state.offset_y.swap(0, Ordering::SeqCst);
+
+        if let Some(show_widget) = config.get("show_floating_widget").and_then(|v| v.as_bool()) {
+            if show_widget {
+                let _ = widget.show();
+            } else {
+                let _ = widget.hide();
+            }
+        }
+
+        if let Some(always_on_top) = config.get("widget_always_on_top").and_then(|v| v.as_bool()) {
+            let _ = widget.set_always_on_top(always_on_top);
+        }
+
+        if let Some(widget_size) = config.get("widget_size").and_then(|v| v.as_f64()) {
+            let scale = widget.scale_factor().unwrap_or(1.0);
+            let w_phys = (widget_size * scale).round() as u32;
+            let cur_pos = widget
+                .outer_position()
+                .unwrap_or(tauri::PhysicalPosition::new(100, 100));
+            let mut x = cur_pos.x + prev_ox;
+            let mut y = cur_pos.y + prev_oy;
+
+            if let Ok(Some(monitor)) = widget.current_monitor() {
+                let mon_pos = monitor.position();
+                let mon_size = monitor.size();
+                let max_x = mon_pos.x + (mon_size.width as i32) - (w_phys as i32);
+                let max_y = mon_pos.y + (mon_size.height as i32) - (w_phys as i32);
+                x = x.clamp(mon_pos.x, max_x.max(mon_pos.x));
+                y = y.clamp(mon_pos.y, max_y.max(mon_pos.y));
+            }
+
+            set_widget_bounds(&widget, x, y, w_phys, w_phys);
+        }
+    }
+}
+
+#[command]
+pub fn preview_widget_config(app: AppHandle, config: Value) -> Result<(), String> {
+    apply_widget_config_internal(&app, &config);
+    let _ = app.emit("config://changed", config);
+    Ok(())
+}
+
+#[command]
+pub fn set_widget_menu_open(
+    app: AppHandle,
+    open: bool,
+    widget_size: f64,
+    click_x: f64,
+    click_y: f64,
+) -> Result<Value, String> {
+    let widget = app
+        .get_webview_window("floating-widget")
+        .ok_or_else(|| "floating-widget window not found".to_string())?;
+    let menu_state = app.state::<WidgetMenuState>();
+    let scale = widget.scale_factor().unwrap_or(1.0);
+    let cur_pos = widget.outer_position().map_err(|e| e.to_string())?;
+
+    if !open {
+        let prev_ox = menu_state.offset_x.swap(0, Ordering::SeqCst);
+        let prev_oy = menu_state.offset_y.swap(0, Ordering::SeqCst);
+        let mic_phys_x = cur_pos.x + prev_ox;
+        let mic_phys_y = cur_pos.y + prev_oy;
+        let w_phys = (widget_size * scale).round() as u32;
+        set_widget_bounds(&widget, mic_phys_x, mic_phys_y, w_phys, w_phys);
+        return Ok(serde_json::json!({
+            "mic_x": 0.0,
+            "mic_y": 0.0,
+            "menu_x": 0.0,
+            "menu_y": 0.0
+        }));
+    }
+
+    let prev_ox = menu_state.offset_x.load(Ordering::SeqCst);
+    let prev_oy = menu_state.offset_y.load(Ordering::SeqCst);
+    let mic_phys_x = cur_pos.x + prev_ox;
+    let mic_phys_y = cur_pos.y + prev_oy;
+
+    const MENU_W: f64 = 180.0;
+    const MENU_H: f64 = 200.0;
+    const PAD: f64 = 16.0;
+
+    let mut menu_x = click_x.clamp(0.0, widget_size);
+    let mut menu_y = click_y.clamp(0.0, widget_size);
+
+    if let Ok(Some(monitor)) = widget.current_monitor() {
+        let mon_pos = monitor.position();
+        let mon_size = monitor.size();
+        let mon_left = (mon_pos.x as f64) / scale;
+        let mon_top = (mon_pos.y as f64) / scale;
+        let mon_right = mon_left + (mon_size.width as f64) / scale;
+        let mon_bottom = mon_top + (mon_size.height as f64) / scale - 48.0;
+
+        let mic_log_x = (mic_phys_x as f64) / scale;
+        let mic_log_y = (mic_phys_y as f64) / scale;
+
+        if mic_log_x + menu_x + MENU_W + PAD > mon_right {
+            menu_x = (mon_right - PAD - MENU_W - mic_log_x).max(mon_left + PAD - mic_log_x);
+        }
+        if mic_log_y + menu_y + MENU_H + PAD > mon_bottom {
+            menu_y = (mon_bottom - PAD - MENU_H - mic_log_y).max(mon_top + PAD - mic_log_y);
+        }
+    }
+
+    let min_x = (0.0_f64).min(menu_x - PAD);
+    let min_y = (0.0_f64).min(menu_y - PAD);
+    let max_x = widget_size.max(menu_x + MENU_W + PAD);
+    let max_y = widget_size.max(menu_y + MENU_H + PAD);
+
+    let win_log_w = max_x - min_x;
+    let win_log_h = max_y - min_y;
+
+    let mic_dom_x = -min_x;
+    let mic_dom_y = -min_y;
+    let menu_dom_x = menu_x - min_x;
+    let menu_dom_y = menu_y - min_y;
+
+    let new_ox = (mic_dom_x * scale).round() as i32;
+    let new_oy = (mic_dom_y * scale).round() as i32;
+    menu_state.offset_x.store(new_ox, Ordering::SeqCst);
+    menu_state.offset_y.store(new_oy, Ordering::SeqCst);
+
+    let new_win_x = mic_phys_x - new_ox;
+    let new_win_y = mic_phys_y - new_oy;
+    let new_win_w = (win_log_w * scale).round() as u32;
+    let new_win_h = (win_log_h * scale).round() as u32;
+
+    set_widget_bounds(&widget, new_win_x, new_win_y, new_win_w, new_win_h);
+    let _ = widget.set_focus();
+
+    Ok(serde_json::json!({
+        "mic_x": mic_dom_x,
+        "mic_y": mic_dom_y,
+        "menu_x": menu_dom_x,
+        "menu_y": menu_dom_y
+    }))
+}
 
 fn config_path() -> PathBuf {
     let appdata = std::env::var("APPDATA")
@@ -58,38 +233,10 @@ pub fn save_config(app: AppHandle, config: Value) -> Result<(), String> {
         let _ = super::hotkey::unregister_polish_hotkey(app.clone(), old_p);
     }
 
-    // ── Show/hide, resize and reposition floating widget if configured ──
-    if let Some(widget) = app.get_webview_window("floating-widget") {
-        if let Some(show_widget) = config.get("show_floating_widget").and_then(|v| v.as_bool()) {
-            if show_widget {
-                let _ = widget.show();
-            } else {
-                let _ = widget.hide();
-            }
-        }
-
-        if let Some(widget_size) = config.get("widget_size").and_then(|v| v.as_f64()) {
-            let _ = widget.set_size(tauri::Size::Logical(tauri::LogicalSize::new(widget_size, widget_size)));
-            
-            if let Ok(Some(monitor)) = widget.current_monitor() {
-                let scale_factor = monitor.scale_factor();
-                let screen_w = monitor.size().width;
-                let screen_h = monitor.size().height;
-                
-                let widget_w = (widget_size * scale_factor) as u32;
-                let widget_h = (widget_size * scale_factor) as u32;
-                
-                // Place 60px (logical) from right, 140px (logical) from bottom
-                let x = screen_w.saturating_sub(widget_w).saturating_sub((60.0 * scale_factor) as u32);
-                let y = screen_h.saturating_sub(widget_h).saturating_sub((140.0 * scale_factor) as u32);
-                
-                let _ = widget.set_position(tauri::Position::Physical(tauri::PhysicalPosition::new(x as i32, y as i32)));
-            }
-        }
-    }
+    // ── Show/hide, resize and apply floating widget config ──
+    apply_widget_config_internal(&app, &config);
 
     // 3. Emit config changed event
-    use tauri::Emitter;
     let _ = app.emit("config://changed", config.clone());
 
     // 4. Register new hotkey

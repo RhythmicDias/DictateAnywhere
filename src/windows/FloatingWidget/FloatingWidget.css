@@ -22,6 +22,8 @@
 }
 
 html, body, #root {
+  margin: 0;
+  padding: 0;
   background: transparent;
   overflow: hidden;
   width: 100%;
@@ -32,10 +34,17 @@ html, body, #root {
   width: 100%;
   height: 100%;
   position: relative;
-  cursor: grab;
+  background: transparent;
 }
 
-.widget-root:active {
+.mic-button {
+  position: absolute;
+  cursor: grab;
+  border-radius: 50%;
+  background: transparent;
+}
+
+.mic-button:active {
   cursor: grabbing;
 }
 
@@ -43,7 +52,6 @@ html, body, #root {
 .mic-svg {
   width: 100%;
   height: 100%;
-  overflow: visible;
   display: block;
 }
 
@@ -51,10 +59,10 @@ html, body, #root {
 @keyframes pulse-ring {
   0% {
     transform: scale(1);
-    opacity: 0.7;
+    opacity: 0.75;
   }
   100% {
-    transform: scale(1.25);
+    transform: scale(1.14);
     opacity: 0;
   }
 }
@@ -69,8 +77,8 @@ html, body, #root {
   transition: filter 0.15s ease;
 }
 
-.widget-root:hover .mic-circle {
-  filter: brightness(1.15) drop-shadow(0 0 6px rgba(255, 255, 255, 0.35));
+.mic-button:hover .mic-circle {
+  filter: brightness(1.12);
 }
 
 /* ── Context Menu ───────────────────────────────────────────────────── */
@@ -80,8 +88,8 @@ html, body, #root {
   border: 1px solid var(--border-color);
   border-radius: 8px;
   padding: 4px 0;
-  min-width: 172px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  min-width: 168px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45);
   z-index: 9999;
   font-family: var(--font-family);
   font-size: 12px;

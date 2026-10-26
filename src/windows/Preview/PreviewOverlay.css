@@ -32,26 +32,21 @@
   font-family: var(--font-family);
 }
 
-body {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
 /* ── Container Pill ──────────────────────────────────────────────────── */
 .preview-root {
-  width: 380px;
-  height: 56px;
+  width: 216px;
+  height: 36px;
+  margin: 27px auto 0 auto;
   background: var(--bg-overlay);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   border: 1px solid var(--border-color);
-  border-radius: 28px;
+  border-radius: 18px;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 12px;
+  padding: 0 8px;
   cursor: grab;
   transition: border-color 0.3s ease, box-shadow 0.3s ease;
   position: relative;
@@ -85,8 +80,8 @@ body {
 
 /* ── Close Button (Left) ──────────────────────────────────────────────── */
 .btn-close {
-  width: 32px;
-  height: 32px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.05);
@@ -106,8 +101,8 @@ body {
 }
 
 .btn-close svg {
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
 }
 
 /* ── Equalizer Visualizer (Center) ────────────────────────────────────── */
@@ -118,7 +113,7 @@ body {
   gap: 4px;
   flex: 1;
   margin: 0 8px;
-  height: 36px;
+  height: 24px;
   overflow: hidden;
 }
 
@@ -169,8 +164,8 @@ body {
 
 /* ── Action/State Button (Right) ───────────────────────────────────────── */
 .btn-action {
-  width: 32px;
-  height: 32px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   display: flex;
   align-items: center;

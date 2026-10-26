@@ -121,8 +121,11 @@ class Config:
     openrouter_stt_model: str = "openai/whisper-1"
     groq_stt_model: str = "whisper-large-v3-turbo"
 
-    # ── Text Polish ───────────────────────────────────────────────────────────
+    # ── Text Polish & Translation ─────────────────────────────────────────────
     enable_polish: bool = False
+    enable_translation: bool = False
+    translation_language: str = "English"
+    translation_script: str = "Default (Native Script)"
     polish_hotkey: str = "ctrl+alt+p"
     polish_provider: str = "ollama"
     polish_action: str = "Fix Grammar & Spelling"

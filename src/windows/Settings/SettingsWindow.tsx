@@ -4,6 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import {
   getConfig,
   saveConfig,
+  previewWidgetConfig,
   getCorrections,
   saveCorrections,
   listAudioDevices,
@@ -106,6 +107,9 @@ const DEFAULT_CONFIG: Record<string, any> = {
   groq_stt_model: "whisper-large-v3-turbo",
 
   enable_polish: false,
+  enable_translation: false,
+  translation_language: "English",
+  translation_script: "Default (Native Script)",
   polish_provider: "ollama",
   polish_action: "Fix Grammar & Spelling",
   custom_polish_prompt: "Rewrite this text to be more concise.",
@@ -485,7 +489,18 @@ export default function SettingsWindow() {
   }, [isRecordingPolishHotkey]);
 
   const handleFieldChange = (key: string, value: any) => {
-    setConfig((prev) => ({ ...prev, [key]: value }));
+    setConfig((prev) => {
+      const next = { ...prev, [key]: value };
+      if (
+        key === "widget_size" ||
+        key === "widget_opacity" ||
+        key === "show_floating_widget" ||
+        key === "widget_always_on_top"
+      ) {
+        previewWidgetConfig(next).catch(console.error);
+      }
+      return next;
+    });
   };
 
   const handleSave = async () => {
@@ -512,6 +527,14 @@ export default function SettingsWindow() {
   };
 
   const handleCancel = async () => {
+    try {
+      const savedCfg = await getConfig();
+      const restored = { ...DEFAULT_CONFIG, ...(savedCfg || {}) };
+      setConfig(restored);
+      await previewWidgetConfig(restored);
+    } catch (err) {
+      console.error(err);
+    }
     const win = getCurrentWindow();
     await win.hide();
   };

@@ -1,5 +1,153 @@
 import React from "react";
 
+const TRANSLATION_LANGUAGES = [
+  "Afrikaans",
+  "Albanian",
+  "Amharic",
+  "Arabic",
+  "Armenian",
+  "Assamese",
+  "Azerbaijani",
+  "Basque",
+  "Belarusian",
+  "Bengali",
+  "Bosnian",
+  "Bulgarian",
+  "Burmese",
+  "Catalan",
+  "Cebuano",
+  "Chinese (Simplified)",
+  "Chinese (Traditional)",
+  "Croatian",
+  "Czech",
+  "Danish",
+  "Dutch",
+  "English",
+  "Esperanto",
+  "Estonian",
+  "Filipino (Tagalog)",
+  "Finnish",
+  "French",
+  "Galician",
+  "Georgian",
+  "German",
+  "Greek",
+  "Gujarati",
+  "Haitian Creole",
+  "Hausa",
+  "Hebrew",
+  "Hindi",
+  "Hungarian",
+  "Icelandic",
+  "Igbo",
+  "Indonesian",
+  "Irish",
+  "Italian",
+  "Japanese",
+  "Javanese",
+  "Kannada",
+  "Kazakh",
+  "Khmer",
+  "Kinyarwanda",
+  "Konkani",
+  "Korean",
+  "Kurdish",
+  "Kyrgyz",
+  "Lao",
+  "Latin",
+  "Latvian",
+  "Lithuanian",
+  "Luxembourgish",
+  "Macedonian",
+  "Maithili",
+  "Malagasy",
+  "Malay",
+  "Malayalam",
+  "Maltese",
+  "Manipuri",
+  "Maori",
+  "Marathi",
+  "Mongolian",
+  "Nepali",
+  "Norwegian",
+  "Odia (Oriya)",
+  "Pashto",
+  "Persian (Farsi)",
+  "Polish",
+  "Portuguese",
+  "Punjabi",
+  "Romanian",
+  "Russian",
+  "Sanskrit",
+  "Santali",
+  "Scots Gaelic",
+  "Serbian",
+  "Sindhi",
+  "Sinhala",
+  "Slovak",
+  "Slovenian",
+  "Somali",
+  "Spanish",
+  "Sundanese",
+  "Swahili",
+  "Swedish",
+  "Tajik",
+  "Tamil",
+  "Tatar",
+  "Telugu",
+  "Thai",
+  "Tibetan",
+  "Turkish",
+  "Turkmen",
+  "Ukrainian",
+  "Urdu",
+  "Uyghur",
+  "Uzbek",
+  "Vietnamese",
+  "Welsh",
+  "Xhosa",
+  "Yiddish",
+  "Yoruba",
+  "Zulu",
+];
+
+const TRANSLATION_SCRIPTS = [
+  "Default (Native Script)",
+  "Latin / Romanized (Transliterated)",
+  "Arabic / Perso-Arabic",
+  "Armenian",
+  "Assamese",
+  "Bengali",
+  "Burmese (Myanmar)",
+  "Chinese (Simplified Han)",
+  "Chinese (Traditional Han)",
+  "Cyrillic",
+  "Devanagari (Hindi / Marathi / Sanskrit)",
+  "Ethiopic (Ge'ez)",
+  "Georgian",
+  "Greek",
+  "Gujarati",
+  "Gurmukhi (Punjabi)",
+  "Hangul (Korean)",
+  "Hebrew",
+  "Japanese (Kanji / Kana)",
+  "Kannada",
+  "Khmer",
+  "Lao",
+  "Malayalam",
+  "Meitei Mayek (Manipuri)",
+  "Mongolian",
+  "Odia (Oriya)",
+  "Ol Chiki (Santali)",
+  "Sinhala",
+  "Tamil",
+  "Telugu",
+  "Thaana (Dhivehi)",
+  "Thai",
+  "Tibetan",
+  "Urdu (Nastaliq)",
+];
+
 interface PolishTabProps {
   config: Record<string, any>;
   handleFieldChange: (field: string, val: any) => void;
@@ -35,7 +183,7 @@ export const PolishTab: React.FC<PolishTabProps> = ({
           </label>
         </div>
 
-        {config.enable_polish && (
+        {(config.enable_polish || config.enable_translation) && (
           <>
             <div className="grid-2">
               <div className="form-group">
@@ -52,24 +200,26 @@ export const PolishTab: React.FC<PolishTabProps> = ({
                 </select>
               </div>
 
-              <div className="form-group">
-                <label htmlFor="polish_action">Refinement Action</label>
-                <select
-                  id="polish_action"
-                  value={config.polish_action}
-                  onChange={(e) => handleFieldChange("polish_action", e.target.value)}
-                >
-                  <option value="Fix Grammar & Spelling">Fix Grammar & Spelling</option>
-                  <option value="Make Professional">Make Professional</option>
-                  <option value="Summarize">Summarize</option>
-                  <option value="Bullet Points">Create Bullet Points</option>
-                  <option value="Chat">Chat</option>
-                  <option value="Custom Prompt">Use Custom Prompt</option>
-                </select>
-              </div>
+              {config.enable_polish && (
+                <div className="form-group">
+                  <label htmlFor="polish_action">Refinement Action</label>
+                  <select
+                    id="polish_action"
+                    value={config.polish_action}
+                    onChange={(e) => handleFieldChange("polish_action", e.target.value)}
+                  >
+                    <option value="Fix Grammar & Spelling">Fix Grammar & Spelling</option>
+                    <option value="Make Professional">Make Professional</option>
+                    <option value="Summarize">Summarize</option>
+                    <option value="Bullet Points">Create Bullet Points</option>
+                    <option value="Chat">Chat</option>
+                    <option value="Custom Prompt">Use Custom Prompt</option>
+                  </select>
+                </div>
+              )}
             </div>
 
-            {config.polish_action === "Custom Prompt" && (
+            {config.enable_polish && config.polish_action === "Custom Prompt" && (
               <div className="form-group">
                 <label htmlFor="custom_polish_prompt">Custom Polish Prompt</label>
                 <textarea
@@ -187,6 +337,61 @@ export const PolishTab: React.FC<PolishTabProps> = ({
                 />
               </div>
             ) : null}
+          </>
+        )}
+      </div>
+
+      <div className="setting-card">
+        <div className="setting-card-title">Translation</div>
+        <div className="form-group-row">
+          <label htmlFor="enable_translation">Enable Translation</label>
+          <label className="switch">
+            <input
+              type="checkbox"
+              id="enable_translation"
+              checked={!!config.enable_translation}
+              onChange={(e) => handleFieldChange("enable_translation", e.target.checked)}
+            />
+            <span className="slider"></span>
+          </label>
+        </div>
+
+        {config.enable_translation && (
+          <>
+            <div className="grid-2">
+              <div className="form-group">
+                <label htmlFor="translation_language">Target Language</label>
+                <select
+                  id="translation_language"
+                  value={config.translation_language || "English"}
+                  onChange={(e) => handleFieldChange("translation_language", e.target.value)}
+                >
+                  {TRANSLATION_LANGUAGES.map((lang) => (
+                    <option key={lang} value={lang}>
+                      {lang}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="translation_script">Translation Language Script</label>
+                <select
+                  id="translation_script"
+                  value={config.translation_script || "Default (Native Script)"}
+                  onChange={(e) => handleFieldChange("translation_script", e.target.value)}
+                >
+                  {TRANSLATION_SCRIPTS.map((script) => (
+                    <option key={script} value={script}>
+                      {script}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="form-helper" style={{ paddingBottom: "6px" }}>
+              Transcribed text is sent to the selected Polish Provider and returned in the target language and script (e.g. Konkani in Kannada script).
+            </div>
           </>
         )}
       </div>

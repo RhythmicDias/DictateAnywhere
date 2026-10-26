@@ -344,8 +344,8 @@ export default function PreviewOverlay() {
         const noise = Math.sin(timeSec * 12 + i * 0.75) * 0.08 + Math.cos(timeSec * 5 - i * 0.4) * 0.04;
         const finalLevel = isRunning ? Math.max(0.02, currentLvl + noise) : 0.02;
 
-        // Peak height limit 32px (container height is 56px, vertical space is 36px)
-        const h = 4 + 28 * finalLevel * weight;
+        // Peak height limit 22px (container height is 36px, vertical space is 24px)
+        const h = 4 + 18 * finalLevel * weight;
 
         // Custom purple-to-cyan gradient
         const hue = 180 + (distance / CENTER_INDEX) * 105;

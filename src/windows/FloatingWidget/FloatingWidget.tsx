@@ -14,7 +14,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen, emit } from "@tauri-apps/api/event";
 import { useDictationStore, type DictationState } from "../../store/dictationStore";
 import { setupDictationListeners, useWakeRecovery } from "../../lib/events";
-import { getConfig } from "../../lib/commands";
+import { getConfig, setWidgetMenuOpen } from "../../lib/commands";
 import "./FloatingWidget.css";
 
 // ── Colour palette (matches Python floating_widget.py) ─────────────────────
@@ -65,7 +65,7 @@ function MicPath({ color }: { color: string }) {
 
 // ── Countdown arc (SVG stroke-dashoffset technique) ─────────────────────────
 function CountdownArc({ fraction }: { fraction: number }) {
-  const R = 28;
+  const R = 27.25;
   const circumference = 2 * Math.PI * R;
   const dash = circumference * Math.max(0, Math.min(1, fraction));
   const color = fraction > 0.5 ? "#4CAF50" : fraction > 0.2 ? "#FFC107" : "#FF5252";
@@ -88,6 +88,7 @@ function CountdownArc({ fraction }: { fraction: number }) {
 export default function FloatingWidget() {
   const { state, setState } = useDictationStore();
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [micPos, setMicPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [countdown, setCountdown] = useState<number>(1); // 1 = full, 0 = empty
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef<number>(0);
@@ -97,8 +98,21 @@ export default function FloatingWidget() {
   const [widgetOpacity, setWidgetOpacity] = useState<number>(0.85);
   const [maxSeconds, setMaxSeconds] = useState<number>(30);
 
+  const widgetSizeRef = useRef<number>(64);
+  const micPosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const dragStartRef = useRef<{ x: number; y: number } | null>(null);
+  const didDragRef = useRef<boolean>(false);
+
   const col = COLOURS[state];
   const wakeTrigger = useWakeRecovery();
+
+  function closeContextMenu(sizeOverride?: number) {
+    const targetSize = sizeOverride ?? widgetSizeRef.current;
+    setContextMenu(null);
+    setMicPos({ x: 0, y: 0 });
+    micPosRef.current = { x: 0, y: 0 };
+    setWidgetMenuOpen(false, targetSize, 0, 0).catch(console.error);
+  }
 
   // ── Subscribe to Tauri events & config ────────────────────────────────────
   useEffect(() => {
@@ -121,6 +135,7 @@ export default function FloatingWidget() {
           const size = Number(cfg.widget_size) || 64;
           const opacity = Number(cfg.widget_opacity) || 0.85;
           const maxSec = Number(cfg.max_record_seconds) || 30;
+          widgetSizeRef.current = size;
           setWidgetSize(size);
           setWidgetOpacity(opacity);
           setMaxSeconds(maxSec);
@@ -137,6 +152,10 @@ export default function FloatingWidget() {
         const size = Number(cfg.widget_size) || 64;
         const opacity = Number(cfg.widget_opacity) || 0.85;
         const maxSec = Number(cfg.max_record_seconds) || 30;
+        widgetSizeRef.current = size;
+        setContextMenu(null);
+        setMicPos({ x: 0, y: 0 });
+        micPosRef.current = { x: 0, y: 0 };
         setWidgetSize(size);
         setWidgetOpacity(opacity);
         setMaxSeconds(maxSec);
@@ -155,6 +174,35 @@ export default function FloatingWidget() {
       unlistenConfig?.();
     };
   }, [wakeTrigger]);
+
+  // ── Close context menu on window blur or Escape ───────────────────────────
+  useEffect(() => {
+    if (!contextMenu) return;
+
+    const handleBlur = () => closeContextMenu();
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeContextMenu();
+    };
+
+    window.addEventListener("blur", handleBlur);
+    window.addEventListener("keydown", handleKeyDown);
+
+    let unlistenFocus: (() => void) | null = null;
+    getCurrentWindow()
+      .onFocusChanged(({ payload: focused }) => {
+        if (!focused) closeContextMenu();
+      })
+      .then((un) => {
+        unlistenFocus = un;
+      })
+      .catch(console.error);
+
+    return () => {
+      window.removeEventListener("blur", handleBlur);
+      window.removeEventListener("keydown", handleKeyDown);
+      unlistenFocus?.();
+    };
+  }, [contextMenu]);
 
   // ── Countdown timer (active state) ────────────────────────────────────────
   useEffect(() => {
@@ -179,21 +227,44 @@ export default function FloatingWidget() {
     };
   }, [state]);
 
-  // ── Drag: delegate to Tauri window manager ────────────────────────────────
+  // ── Drag: delegate to Tauri window manager after 4px threshold ───────────
   function handleMouseDown(e: React.MouseEvent) {
-    if (e.button !== 0) return; // left button only
-    e.preventDefault();
-    getCurrentWindow().startDragging().catch(console.error);
+    if (e.button !== 0 || contextMenu) return; // left button only when menu closed
+    dragStartRef.current = { x: e.screenX, y: e.screenY };
+    didDragRef.current = false;
+  }
+
+  function handleMouseMove(e: React.MouseEvent) {
+    if (!dragStartRef.current || (e.buttons & 1) === 0) return;
+    const dx = e.screenX - dragStartRef.current.x;
+    const dy = e.screenY - dragStartRef.current.y;
+    if (Math.hypot(dx, dy) > 4) {
+      dragStartRef.current = null;
+      didDragRef.current = true;
+      getCurrentWindow().startDragging().catch(console.error);
+    }
+  }
+
+  function handleMouseUp() {
+    dragStartRef.current = null;
   }
 
   // ── Context menu ──────────────────────────────────────────────────────────
-  function handleContextMenu(e: React.MouseEvent) {
+  async function handleContextMenu(e: React.MouseEvent) {
     e.preventDefault();
-    setContextMenu({ x: e.clientX, y: e.clientY });
-  }
-
-  function closeContextMenu() {
-    setContextMenu(null);
+    e.stopPropagation();
+    const clickX = Math.max(0, Math.min(widgetSize, e.clientX - micPosRef.current.x));
+    const clickY = Math.max(0, Math.min(widgetSize, e.clientY - micPosRef.current.y));
+    try {
+      const layout = await setWidgetMenuOpen(true, widgetSize, clickX, clickY);
+      const nextMicPos = { x: layout.mic_x, y: layout.mic_y };
+      micPosRef.current = nextMicPos;
+      setMicPos(nextMicPos);
+      setContextMenu({ x: layout.menu_x, y: layout.menu_y });
+    } catch (err) {
+      console.error(err);
+      setContextMenu({ x: clickX, y: clickY });
+    }
   }
 
   async function handleMenuAction(id: string) {
@@ -217,13 +288,21 @@ export default function FloatingWidget() {
         await emit("window://show", { label: "settings" });
         break;
       case "quit":
-        getCurrentWindow().close();
+        await emit("app://quit", {});
         break;
     }
   }
 
   // ── Click = toggle dictation ──────────────────────────────────────────────
   function handleClick() {
+    if (didDragRef.current) {
+      didDragRef.current = false;
+      return;
+    }
+    if (contextMenu) {
+      closeContextMenu();
+      return;
+    }
     if (state === "idle" || state === "error") {
       setState("active");
       emit("dictation://start", {}).catch(console.error);
@@ -234,80 +313,72 @@ export default function FloatingWidget() {
   }
 
   return (
-    <div
-      className="widget-root"
-      onMouseDown={handleMouseDown}
-      onContextMenu={handleContextMenu}
-      onClick={handleClick}
-      style={{
-        width: `${widgetSize}px`,
-        height: `${widgetSize}px`,
-        opacity: widgetOpacity
-      }}
-    >
-      <svg className="mic-svg" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
-        {/* Drop shadow filter */}
-        <defs>
-          <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
-            <feGaussianBlur stdDeviation="3" result="blur" />
-            <feMerge>
-              <feMergeNode in="blur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-        </defs>
+    <div className="widget-root" onContextMenu={handleContextMenu}>
+      <div
+        className="mic-button"
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onClick={handleClick}
+        style={{
+          left: `${micPos.x}px`,
+          top: `${micPos.y}px`,
+          width: `${widgetSize}px`,
+          height: `${widgetSize}px`,
+          opacity: state === "idle" ? widgetOpacity : 1,
+        }}
+      >
+        <svg className="mic-svg" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+          {/* Pulse ring — only shown when active */}
+          {state === "active" && (
+            <circle
+              className="pulse-ring"
+              cx="32" cy="32" r="27"
+              fill="none"
+              stroke={col.ring}
+              strokeWidth="2"
+              opacity="0.6"
+            />
+          )}
 
-        {/* Pulse ring — only shown when active */}
-        {state === "active" && (
+          {/* Main circle */}
           <circle
-            className="pulse-ring"
-            cx="32" cy="32" r="30"
+            className="mic-circle"
+            cx="32" cy="32" r="28"
+            fill={col.bg}
+          />
+
+          {/* Ring border */}
+          <circle
+            cx="32" cy="32" r="27.25"
             fill="none"
             stroke={col.ring}
-            strokeWidth="2.5"
+            strokeWidth="1.5"
             opacity="0.6"
           />
-        )}
 
-        {/* Main circle */}
-        <circle
-          className="mic-circle"
-          cx="32" cy="32" r="29"
-          fill={col.bg}
-          filter="url(#glow)"
-          style={{ filter: `drop-shadow(0 0 8px ${col.glow})` }}
-        />
+          {/* Countdown arc (active state only) */}
+          {state === "active" && <CountdownArc fraction={countdown} />}
 
-        {/* Ring border */}
-        <circle
-          cx="32" cy="32" r="29"
-          fill="none"
-          stroke={col.ring}
-          strokeWidth="1.5"
-          opacity="0.6"
-        />
-
-        {/* Countdown arc (active state only) */}
-        {state === "active" && <CountdownArc fraction={countdown} />}
-
-        {/* Microphone icon */}
-        {state === "loading" ? (
-          /* Loading spinner dots */
-          <g fill="white" opacity="0.9">
-            <circle cx="24" cy="32" r="3"><animate attributeName="opacity" values="1;0.2;1" dur="1s" begin="0s" repeatCount="indefinite"/></circle>
-            <circle cx="32" cy="32" r="3"><animate attributeName="opacity" values="1;0.2;1" dur="1s" begin="0.3s" repeatCount="indefinite"/></circle>
-            <circle cx="40" cy="32" r="3"><animate attributeName="opacity" values="1;0.2;1" dur="1s" begin="0.6s" repeatCount="indefinite"/></circle>
-          </g>
-        ) : state === "error" ? (
-          /* Error cross */
-          <g stroke="white" strokeWidth="3" strokeLinecap="round" opacity="0.9">
-            <line x1="24" y1="24" x2="40" y2="40" />
-            <line x1="40" y1="24" x2="24" y2="40" />
-          </g>
-        ) : (
-          <MicPath color="rgba(255,255,255,0.95)" />
-        )}
-      </svg>
+          {/* Microphone icon */}
+          {state === "loading" ? (
+            /* Loading spinner dots */
+            <g fill="white" opacity="0.9">
+              <circle cx="24" cy="32" r="3"><animate attributeName="opacity" values="1;0.2;1" dur="1s" begin="0s" repeatCount="indefinite"/></circle>
+              <circle cx="32" cy="32" r="3"><animate attributeName="opacity" values="1;0.2;1" dur="1s" begin="0.3s" repeatCount="indefinite"/></circle>
+              <circle cx="40" cy="32" r="3"><animate attributeName="opacity" values="1;0.2;1" dur="1s" begin="0.6s" repeatCount="indefinite"/></circle>
+            </g>
+          ) : state === "error" ? (
+            /* Error cross */
+            <g stroke="white" strokeWidth="3" strokeLinecap="round" opacity="0.9">
+              <line x1="24" y1="24" x2="40" y2="40" />
+              <line x1="40" y1="24" x2="24" y2="40" />
+            </g>
+          ) : (
+            <MicPath color="rgba(255,255,255,0.95)" />
+          )}
+        </svg>
+      </div>
 
       {/* Context menu */}
       {contextMenu && (
@@ -315,11 +386,17 @@ export default function FloatingWidget() {
           {/* Invisible backdrop to catch outside clicks */}
           <div
             style={{ position: "fixed", inset: 0, zIndex: 9998 }}
-            onClick={closeContextMenu}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              closeContextMenu();
+            }}
           />
           <div
             className="context-menu"
-            style={{ left: contextMenu.x, top: contextMenu.y }}
+            style={{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
           >
             {MENU_ITEMS.map((item) => {
               if (item.separator) {

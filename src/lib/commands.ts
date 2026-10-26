@@ -10,6 +10,33 @@ export async function saveConfig(config: Record<string, unknown>): Promise<void>
   return invoke("save_config", { config });
 }
 
+/** Live-preview floating widget size, opacity, visibility, and always-on-top. */
+export async function previewWidgetConfig(config: Record<string, unknown>): Promise<void> {
+  return invoke("preview_widget_config", { config });
+}
+
+export interface WidgetMenuLayout {
+  mic_x: number;
+  mic_y: number;
+  menu_x: number;
+  menu_y: number;
+}
+
+/** Expand or restore the floating widget window to fit its right-click context menu. */
+export async function setWidgetMenuOpen(
+  open: boolean,
+  widgetSize: number,
+  clickX: number,
+  clickY: number
+): Promise<WidgetMenuLayout> {
+  return invoke<WidgetMenuLayout>("set_widget_menu_open", {
+    open,
+    widgetSize,
+    clickX,
+    clickY,
+  });
+}
+
 /** Register a global hotkey. mode: "toggle" | "push_to_talk" */
 export async function registerHotkey(hotkey: string, mode: string): Promise<void> {
   return invoke("register_hotkey", { hotkey, mode });

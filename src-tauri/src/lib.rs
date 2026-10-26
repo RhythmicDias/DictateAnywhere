@@ -19,7 +19,8 @@ use tauri::{
 
 use commands::config::{
     get_config, save_config, get_corrections, save_corrections, select_file, export_text_file,
-    get_cached_models, delete_cached_model, get_ollama_models, check_for_updates, open_config_folder
+    get_cached_models, delete_cached_model, get_ollama_models, check_for_updates, open_config_folder,
+    WidgetMenuState, preview_widget_config, set_widget_menu_open, apply_widget_config_internal
 };
 use commands::hotkey::{register_hotkey, unregister_hotkey, register_polish_hotkey, unregister_polish_hotkey};
 use commands::sidecar::{SidecarState, start_sidecar, start_sidecar_with_state, send_to_sidecar, send_to_sidecar_owned, stop_sidecar, list_audio_devices, restart_sidecar_internal};
@@ -133,8 +134,8 @@ pub fn position_preview_window(app: &AppHandle) {
         let scale_factor = monitor.scale_factor();
         
         if let Some(preview) = app.get_webview_window("preview") {
-            let preview_w = (480.0 * scale_factor) as u32;
-            let preview_h = (110.0 * scale_factor) as u32;
+            let preview_w = (280.0 * scale_factor) as u32;
+            let preview_h = (90.0 * scale_factor) as u32;
             let _ = preview.set_size(tauri::Size::Physical(tauri::PhysicalSize::new(preview_w, preview_h)));
             
             let x = screen_w.saturating_sub(preview_w) / 2;
@@ -291,20 +292,29 @@ fn handle_system_wake(app: &AppHandle) {
 pub fn run() {
     tauri::Builder::default()
         .manage(SidecarState::default())
+        .manage(WidgetMenuState::default())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_shell::init())
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 let label = window.label();
-                if label == "settings" || label == "history" {
+                if label == "settings" || label == "history" || label == "floating-widget" || label == "preview" {
                     api.prevent_close();
                     let _ = window.hide();
+                    if label == "settings" {
+                        if let Ok(cfg) = get_config() {
+                            apply_widget_config_internal(window.app_handle(), &cfg);
+                            let _ = window.app_handle().emit("config://changed", cfg);
+                        }
+                    }
                 }
             }
         })
         .invoke_handler(tauri::generate_handler![
             get_config,
             save_config,
+            preview_widget_config,
+            set_widget_menu_open,
             get_corrections,
             save_corrections,
             select_file,
@@ -379,7 +389,7 @@ pub fn run() {
             app.manage(tray);
 
             // ── Load config values for widget sizing & opacity ───────────────────
-            let (widget_size, _widget_opacity, show_floating_widget) = if let Ok(cfg) = get_config() {
+            let (widget_size, _widget_opacity, show_floating_widget, widget_always_on_top) = if let Ok(cfg) = get_config() {
                 let s = cfg.get("widget_size")
                     .and_then(|v| v.as_f64())
                     .unwrap_or(64.0);
@@ -389,9 +399,12 @@ pub fn run() {
                 let show = cfg.get("show_floating_widget")
                     .and_then(|v| v.as_bool())
                     .unwrap_or(true);
-                (s, o, show)
+                let aot = cfg.get("widget_always_on_top")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(true);
+                (s, o, show, aot)
             } else {
-                (64.0, 0.85, true)
+                (64.0, 0.85, true, true)
             };
 
             // ── Position and show windows programmatically ───────────────────
@@ -404,6 +417,7 @@ pub fn run() {
                 // 1. Position Floating Widget near right-lower corner:
                 // Scale physical dimensions correctly.
                 if let Some(widget) = app.get_webview_window("floating-widget") {
+                    let _ = widget.set_always_on_top(widget_always_on_top);
                     let _ = widget.set_size(tauri::Size::Logical(tauri::LogicalSize::new(widget_size, widget_size)));
                     
                     
@@ -427,6 +441,7 @@ pub fn run() {
             } else {
                 // Fallback if monitor details are unavailable
                 if let Some(widget) = app.get_webview_window("floating-widget") {
+                    let _ = widget.set_always_on_top(widget_always_on_top);
                     if show_floating_widget {
                         let _ = widget.show();
                     } else {
@@ -440,6 +455,10 @@ pub fn run() {
             setup_polish_hotkey(app.handle());
 
             // ── Register window management listeners ────────────────────────
+            let app_handle = app.handle().clone();
+            app.listen("app://quit", move |_event| {
+                app_handle.exit(0);
+            });
             let app_handle = app.handle().clone();
             app.listen("window://show", move |event| {
                 #[derive(serde::Deserialize)]
@@ -468,13 +487,91 @@ pub fn run() {
                 println!("[Rust] Received dictation://start event");
                 let handle = app_handle.clone();
                 tauri::async_runtime::spawn(async move {
-                    let config = match get_config() {
+                    let mut config = match get_config() {
                         Ok(cfg) => cfg,
                         Err(e) => {
                             eprintln!("[Rust] Failed to load config: {}", e);
                             serde_json::json!({})
                         }
                     };
+
+                    let enable_translation = config
+                        .get("enable_translation")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false);
+
+                    if enable_translation {
+                        let target_lang = config
+                            .get("translation_language")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("English")
+                            .to_string();
+                        let target_script = config
+                            .get("translation_script")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("Default (Native Script)")
+                            .to_string();
+                        let polish_enabled = config
+                            .get("enable_polish")
+                            .and_then(|v| v.as_bool())
+                            .unwrap_or(false);
+                        let action = config
+                            .get("polish_action")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("Fix Grammar & Spelling")
+                            .to_string();
+                        let user_prompt = config
+                            .get("custom_polish_prompt")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("")
+                            .to_string();
+
+                        let has_custom_script = !target_script.is_empty()
+                            && target_script != "Default (Native Script)";
+                        let lang_spec = if has_custom_script {
+                            format!(
+                                "{target_lang} written strictly in {target_script} script (keep the vocabulary and grammar in the {target_lang} language, but write/transliterate all words using {target_script} script characters)"
+                            )
+                        } else {
+                            target_lang.clone()
+                        };
+
+                        let effective_prompt = if !polish_enabled {
+                            format!(
+                                "Translate the text accurately and naturally into {lang_spec}. Preserve the original meaning, tone, and grammatical person. Return ONLY the translated text, without any explanations, quotes, or introductory/concluding remarks."
+                            )
+                        } else {
+                            match action.as_str() {
+                                "Fix Grammar & Spelling" => format!(
+                                    "Fix spelling, grammar, and punctuation errors, and translate the text accurately and naturally into {lang_spec}. Always keep the exact pronouns, grammatical person, tone, and meaning. Return ONLY the final corrected and translated text."
+                                ),
+                                "Make Professional" => format!(
+                                    "Rewrite the text to be clear, professional, and suitable for formal communication, and translate it into {lang_spec}. Return ONLY the final rewritten and translated text."
+                                ),
+                                "Summarize" => format!(
+                                    "Provide a brief, clear summary of the text written in {lang_spec}. Return ONLY the summary."
+                                ),
+                                "Bullet Points" => format!(
+                                    "Convert the text into clear, concise bullet points written in {lang_spec}. Return ONLY the bullet points."
+                                ),
+                                "Chat" => format!(
+                                    "Respond directly, helpfully, and naturally to the user's input in {lang_spec}."
+                                ),
+                                "Custom Prompt" => format!(
+                                    "{user_prompt}\n\nIMPORTANT: Translate and return the final output in {lang_spec}. Output ONLY the final text, with no introductory or concluding remarks."
+                                ),
+                                _ => format!(
+                                    "Process the text according to '{action}' and translate the result into {lang_spec}. Return ONLY the final text."
+                                ),
+                            }
+                        };
+
+                        if let Some(obj) = config.as_object_mut() {
+                            obj.insert("enable_polish".to_string(), serde_json::json!(true));
+                            obj.insert("polish_action".to_string(), serde_json::json!("Custom Prompt"));
+                            obj.insert("custom_polish_prompt".to_string(), serde_json::json!(effective_prompt));
+                        }
+                    }
                     
                     // Fetch keys from keyring securely
                     let azure_key = get_api_key("azure".to_string()).ok().flatten().unwrap_or_default();

@@ -77,8 +77,11 @@ pub struct AppConfig {
     pub last_update_check: String,
     pub skipped_update_version: String,
 
-    // Text polish
+    // Text polish & translation
     pub enable_polish: bool,
+    pub enable_translation: bool,
+    pub translation_language: String,
+    pub translation_script: String,
     pub polish_provider: String,
     pub polish_action: String,
     pub custom_polish_prompt: String,
@@ -146,6 +149,9 @@ impl Default for AppConfig {
             last_update_check: String::new(),
             skipped_update_version: String::new(),
             enable_polish: false,
+            enable_translation: false,
+            translation_language: "English".into(),
+            translation_script: "Default (Native Script)".into(),
             polish_provider: "ollama".into(),
             polish_action: "Fix Grammar & Spelling".into(),
             custom_polish_prompt: "Rewrite this text to be more concise.".into(),

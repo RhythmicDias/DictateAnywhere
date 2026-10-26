@@ -319,8 +319,11 @@ class SidecarRunner:
                     self.send_event("state", {"state": "idle"})
                     return
 
-                # Text Polish
+                # Text Polish & Translation
                 enable_polish = params.get("enable_polish", self.cfg.get("enable_polish", False))
+                enable_translation = params.get("enable_translation", self.cfg.get("enable_translation", False))
+                translation_language = params.get("translation_language", self.cfg.get("translation_language", "English"))
+                translation_script = params.get("translation_script", self.cfg.get("translation_script", "Default (Native Script)"))
                 polished = False
                 polish_provider = "none"
                 polish_model = ""
@@ -329,10 +332,31 @@ class SidecarRunner:
 
                 raw_text = text # Keep original Whisper text
 
-                if enable_polish:
+                if enable_polish or enable_translation:
                     provider = params.get("polish_provider", self.cfg.get("polish_provider", "none"))
                     action = params.get("polish_action", self.cfg.get("polish_action", "Fix Grammar & Spelling"))
                     custom_prompt = params.get("custom_polish_prompt", self.cfg.get("custom_polish_prompt", ""))
+                    has_custom_script = bool(translation_script and translation_script != "Default (Native Script)")
+                    lang_spec = (
+                        f"{translation_language} written strictly in {translation_script} script "
+                        f"(keep the vocabulary and grammar in the {translation_language} language, "
+                        f"but write/transliterate all words using {translation_script} script characters)"
+                        if has_custom_script else translation_language
+                    )
+                    if enable_translation and not enable_polish:
+                        action = "Custom Prompt"
+                        custom_prompt = (
+                            f"Translate the text accurately and naturally into {lang_spec}. "
+                            f"Preserve the original meaning, tone, and grammatical person. "
+                            f"Return ONLY the translated text, without any explanations, quotes, or introductory/concluding remarks."
+                        )
+                    elif enable_translation and translation_language and translation_language not in custom_prompt:
+                        action = "Custom Prompt"
+                        base_rule = custom_prompt if params.get("polish_action") == "Custom Prompt" else f"Apply '{params.get('polish_action', 'Fix Grammar & Spelling')}'"
+                        custom_prompt = (
+                            f"{base_rule}\n\nIMPORTANT: Translate and return the final output in {lang_spec}. "
+                            f"Output ONLY the final text, with no introductory or concluding remarks."
+                        )
                     polish_provider = provider
                     
                     if provider == "ollama":
