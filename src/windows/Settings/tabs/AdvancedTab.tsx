@@ -4,9 +4,6 @@ import { ModelCacheInfo } from "../../../lib/commands";
 interface AdvancedTabProps {
   config: Record<string, any>;
   handleFieldChange: (field: string, val: any) => void;
-  handleCheckUpdates: () => void;
-  updateCheckStatus: string;
-  updateCheckMessage: string;
   handleOpenConfigFolder: () => void;
   isLoadingCache: boolean;
   cachedModels: ModelCacheInfo[];
@@ -16,9 +13,6 @@ interface AdvancedTabProps {
 export const AdvancedTab: React.FC<AdvancedTabProps> = ({
   config,
   handleFieldChange,
-  handleCheckUpdates,
-  updateCheckStatus,
-  updateCheckMessage,
   handleOpenConfigFolder,
   isLoadingCache,
   cachedModels,
@@ -115,32 +109,6 @@ export const AdvancedTab: React.FC<AdvancedTabProps> = ({
             <option value="WARNING">WARNING (Only alerts/errors)</option>
             <option value="ERROR">ERROR (Fatal errors only)</option>
           </select>
-        </div>
-      </div>
-
-      <div className="setting-card">
-        <div className="setting-card-title">Auto-Updates</div>
-        <div className="form-group-row">
-          <label htmlFor="check_updates">Check for Updates Automatically</label>
-          <label className="switch">
-            <input
-              type="checkbox"
-              id="check_updates"
-              checked={config.check_updates}
-              onChange={(e) => handleFieldChange("check_updates", e.target.checked)}
-            />
-            <span className="slider"></span>
-          </label>
-        </div>
-        <div className="form-group" style={{ marginTop: "12px" }}>
-          <button className="btn btn-secondary" onClick={handleCheckUpdates}>
-            Check Updates Now
-          </button>
-          {updateCheckStatus !== "idle" && (
-            <div style={{ marginTop: "8px", fontSize: "13px", color: updateCheckStatus === "error" ? "#f38ba8" : "#a6e3a1" }}>
-              {updateCheckMessage}
-            </div>
-          )}
         </div>
       </div>
 

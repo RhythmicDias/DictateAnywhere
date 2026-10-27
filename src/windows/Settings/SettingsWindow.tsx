@@ -28,6 +28,7 @@ import { AdvancedTab } from "./tabs/AdvancedTab";
 import { CorrectionsTab } from "./tabs/CorrectionsTab";
 import { PolishTab } from "./tabs/PolishTab";
 import { LauncherTab } from "./tabs/LauncherTab";
+import { AboutTab } from "./tabs/AboutTab";
 
 type TabName =
   | "engine"
@@ -38,7 +39,8 @@ type TabName =
   | "widget"
   | "corrections"
   | "launcher"
-  | "advanced";
+  | "advanced"
+  | "about";
 
 const TAB_TITLES: Record<TabName, string> = {
   engine: "Engine",
@@ -50,6 +52,7 @@ const TAB_TITLES: Record<TabName, string> = {
   corrections: "Auto-Correct",
   launcher: "App Launcher",
   advanced: "Advanced",
+  about: "About",
 };
 
 const DEFAULT_CONFIG: Record<string, any> = {
@@ -195,6 +198,7 @@ export default function SettingsWindow() {
   // Update check State
   const [updateCheckStatus, setUpdateCheckStatus] = useState<"idle" | "checking" | "success" | "error">("idle");
   const [updateCheckMessage, setUpdateCheckMessage] = useState("");
+  const [updateReleaseUrl, setUpdateReleaseUrl] = useState("");
 
   // Microphone level meter State
   const [showMicTest, setShowMicTest] = useState(false);
@@ -321,14 +325,16 @@ export default function SettingsWindow() {
   const handleCheckUpdates = () => {
     setUpdateCheckStatus("checking");
     setUpdateCheckMessage("Checking for updates...");
+    setUpdateReleaseUrl("");
     checkForUpdates()
       .then((res) => {
         if (res.is_newer) {
           setUpdateCheckStatus("success");
-          setUpdateCheckMessage(`Update available: v${res.latest}. Please download the latest version.`);
+          setUpdateCheckMessage(`Update available: v${res.latest} (current: v${res.current}).`);
+          setUpdateReleaseUrl(res.url || "https://github.com/RhythmicDias/DictateAnywhere/releases/latest");
         } else {
           setUpdateCheckStatus("success");
-          setUpdateCheckMessage(`App is up-to-date (v${res.current}).`);
+          setUpdateCheckMessage(`✓ DictateAnywhere is up to date (v${res.current}).`);
         }
       })
       .catch((err) => {
@@ -822,6 +828,16 @@ export default function SettingsWindow() {
             </svg>
             Advanced
           </button>
+          <button
+            className={`tab-btn ${activeTab === "about" ? "active" : ""}`}
+            onClick={() => setActiveTab("about")}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 16v-4M12 8h.01" />
+            </svg>
+            About
+          </button>
         </div>
 
         {/* Tab Contents Main Area */}
@@ -950,13 +966,21 @@ export default function SettingsWindow() {
               <AdvancedTab
                 config={config}
                 handleFieldChange={handleFieldChange}
-                handleCheckUpdates={handleCheckUpdates}
-                updateCheckStatus={updateCheckStatus}
-                updateCheckMessage={updateCheckMessage}
                 handleOpenConfigFolder={handleOpenConfigFolder}
                 isLoadingCache={isLoadingCache}
                 cachedModels={cachedModels}
                 handleDeleteModel={handleDeleteModel}
+              />
+            )}
+
+            {activeTab === "about" && (
+              <AboutTab
+                config={config}
+                handleFieldChange={handleFieldChange}
+                handleCheckUpdates={handleCheckUpdates}
+                updateCheckStatus={updateCheckStatus}
+                updateCheckMessage={updateCheckMessage}
+                updateReleaseUrl={updateReleaseUrl}
               />
             )}
           </div>

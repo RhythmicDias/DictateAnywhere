@@ -14,6 +14,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - **Translation Language Script Selector**: Added a **Translation Language Script** dropdown (`translation_script`) supporting 35+ writing scripts (e.g., *Kannada*, *Devanagari*, *Latin / Romanized*, *Malayalam*, *Tamil*, *Telugu*, *Arabic / Perso-Arabic*, *Cyrillic*), allowing translated output to be rendered in a specific script while preserving target-language vocabulary and grammar (e.g., Mangalorean Konkani in Kannada script).
 - **Floating Widget Live Appearance Preview**: Adjusting **Widget Diameter** (`32px–128px`) or **Widget Idle Opacity** in Settings now resizes and updates the floating widget in real time (and reverts if canceled).
 - **Unclipped Floating Widget Context Menu**: Right-clicking the floating mic button now dynamically expands the transparent window via atomic Win32 `SetWindowPos` so the custom dark context menu renders cleanly without clipping at any widget size.
+- **About Settings Tab**: Added a dedicated **About** section below **Advanced** featuring app metadata, quick repository/release links, architecture details, and relocated software update controls.
 
 ### Changed
 - **Compact Dictation Preview Overlay**: Reduced the floating preview pill dimensions to a sleek `216×36px` (`280×90` window bounds) with proportionally scaled buttons and equalizer bars.

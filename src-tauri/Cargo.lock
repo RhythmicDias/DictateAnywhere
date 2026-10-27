@@ -934,7 +934,7 @@ dependencies = [
 
 [[package]]
 name = "dictateanywhere"
-version = "2.0.3"
+version = "2.0.4"
 dependencies = [
  "env_logger",
  "keyring",
