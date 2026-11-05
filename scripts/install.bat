@@ -43,19 +43,13 @@ if errorlevel 1 (
 )
 
 echo.
-echo [DictateAnywhere] Step 3/3 — Downloading font assets ...
-"%PYTHON%" scripts\download_fonts.py
-if errorlevel 1 (
-    echo WARNING: Font download failed — system fallbacks will be used.
-)
-
-echo.
 echo =============================================================================
 echo  Installation complete!
 echo.
-echo  To run DictateAnywhere:
-echo    scripts\run.bat          (no console window -- tray app)
-echo    scripts\run_dev.bat      (with console for debugging)
+echo  To build and run DictateAnywhere (Tauri v2):
+echo    python scripts\build_sidecar.py
+echo    npm install
+echo    RUN.bat  (or npm run tauri dev)
 echo =============================================================================
 echo.
 pause
