@@ -123,7 +123,7 @@ pub fn set_widget_menu_open(
     let mic_phys_y = cur_pos.y + prev_oy;
 
     const MENU_W: f64 = 180.0;
-    const MENU_H: f64 = 200.0;
+    const MENU_H: f64 = 230.0;
     const PAD: f64 = 16.0;
 
     let mut menu_x = click_x.clamp(0.0, widget_size);
@@ -306,6 +306,22 @@ pub async fn select_file() -> Result<Option<String>, String> {
         .add_filter("Executable Files (*.exe)", &["exe"])
         .add_filter("All Files (*.*)", &["*"])
         .set_title("Select Application or File")
+        .pick_file()
+        .await;
+
+    Ok(file.map(|f| f.path().to_string_lossy().to_string()))
+}
+
+/// Open a native Windows file dialogue for selecting an audio or video file to transcribe.
+#[command]
+pub async fn select_audio_file() -> Result<Option<String>, String> {
+    let file = rfd::AsyncFileDialog::new()
+        .add_filter(
+            "Audio & Media Files",
+            &["wav", "mp3", "m4a", "flac", "ogg", "opus", "aac", "wma", "webm", "mp4", "mkv"],
+        )
+        .add_filter("All Files (*.*)", &["*"])
+        .set_title("Select Audio File to Transcribe")
         .pick_file()
         .await;
 

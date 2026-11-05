@@ -57,6 +57,45 @@ pub async fn send_to_sidecar(
 }
 
 #[tauri::command]
+pub async fn transcribe_audio_file(
+    state: State<'_, SidecarState>,
+    file_path: String,
+    include_timestamps: bool,
+    apply_polish: bool,
+    language: Option<String>,
+) -> Result<(), String> {
+    if !state.ready.load(Ordering::SeqCst) {
+        return Err("Transcription sidecar is still initializing. Please wait a moment.".to_string());
+    }
+
+    let mut config = super::config::get_config().unwrap_or_else(|_| serde_json::json!({}));
+    if let Some(lang) = language {
+        if let Some(obj) = config.as_object_mut() {
+            obj.insert("language".to_string(), serde_json::json!(lang));
+        }
+    }
+
+    let gemini_key = super::storage::get_api_key("gemini".to_string()).ok().flatten().unwrap_or_default();
+    let openrouter_key = super::storage::get_api_key("openrouter".to_string()).ok().flatten().unwrap_or_default();
+    let groq_key = super::storage::get_api_key("groq".to_string()).ok().flatten().unwrap_or_default();
+
+    let payload = serde_json::json!({
+        "cmd": "transcribe_file",
+        "file_path": file_path,
+        "include_timestamps": include_timestamps,
+        "apply_polish": apply_polish,
+        "config": config,
+        "api_keys": {
+            "gemini": gemini_key,
+            "openrouter": openrouter_key,
+            "groq": groq_key
+        }
+    });
+
+    send_to_sidecar_owned((*state).clone(), payload)
+}
+
+#[tauri::command]
 pub async fn stop_sidecar(state: State<'_, SidecarState>) -> Result<(), String> {
     let mut guard = state.child.lock().unwrap();
     state.ready.store(false, Ordering::SeqCst);
@@ -163,6 +202,20 @@ pub fn start_sidecar_with_state(app: AppHandle, state: SidecarState) -> Result<(
                                                     eprintln!("[Sidecar Error] {}", msg);
                                                     log_to_file(&format!("[Sidecar Error] {}", msg));
                                                     let _ = app_handle.emit("dictation://error", msg);
+                                                }
+                                            }
+                                            "file_progress" => {
+                                                let _ = app_handle.emit("dictation://file-progress", value.clone());
+                                            }
+                                            "file_result" => {
+                                                let _ = app_handle.emit("dictation://file-result", value.clone());
+                                                let _ = app_handle.emit("dictation://transcription-result", value.clone());
+                                            }
+                                            "file_error" => {
+                                                if let Some(msg) = value.get("message").and_then(|m| m.as_str()) {
+                                                    eprintln!("[Sidecar File Error] {}", msg);
+                                                    log_to_file(&format!("[Sidecar File Error] {}", msg));
+                                                    let _ = app_handle.emit("dictation://file-error", msg);
                                                 }
                                             }
                                             _ => {}

@@ -6,6 +6,7 @@ import FloatingWidget from "./windows/FloatingWidget/FloatingWidget";
 import SettingsWindow from "./windows/Settings/SettingsWindow";
 import PreviewOverlay from "./windows/Preview/PreviewOverlay";
 import HistoryWindow from "./windows/History/HistoryWindow";
+import TranscribeWindow from "./windows/Transcribe/TranscribeWindow";
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -104,7 +105,7 @@ function resolveWindowLabel(): string {
     const hashParams = new URLSearchParams(hash);
     const hWindow = hashParams.get("window");
     if (hWindow) return hWindow;
-    if (["floating-widget", "settings", "preview", "history"].includes(hash)) {
+    if (["floating-widget", "settings", "preview", "history", "transcribe"].includes(hash)) {
       return hash;
     }
   }
@@ -172,6 +173,7 @@ export default function App() {
       {windowLabel === "settings" && <SettingsWindow />}
       {windowLabel === "preview" && <PreviewOverlay />}
       {windowLabel === "history" && <HistoryWindow />}
+      {windowLabel === "transcribe" && <TranscribeWindow />}
       {windowLabel === "floating-widget" && <FloatingWidget />}
     </ErrorBoundary>
   );

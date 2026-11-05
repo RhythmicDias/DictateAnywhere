@@ -41,6 +41,7 @@ const MENU_ITEMS: MenuItem[] = [
   { id: "stop",           label: "Stop Dictation",       disabledWhen: ["idle", "loading", "polishing", "error", "injecting"] },
   { id: "sep1",           label: "",                     separator: true },
   { id: "toggle_preview", label: "Toggle Preview"        },
+  { id: "transcribe",     label: "Transcribe Audio…"     },
   { id: "history",        label: "Session History…"      },
   { id: "settings",       label: "Settings…"             },
   { id: "sep2",           label: "",                     separator: true },
@@ -280,6 +281,9 @@ export default function FloatingWidget() {
         break;
       case "toggle_preview":
         await emit("window://toggle", { label: "preview" });
+        break;
+      case "transcribe":
+        await emit("window://show", { label: "transcribe" });
         break;
       case "history":
         await emit("window://show", { label: "history" });

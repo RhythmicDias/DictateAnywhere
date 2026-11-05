@@ -18,12 +18,12 @@ use tauri::{
 // Unused imports from tauri_plugin_global_shortcut removed
 
 use commands::config::{
-    get_config, save_config, get_corrections, save_corrections, select_file, export_text_file,
+    get_config, save_config, get_corrections, save_corrections, select_file, select_audio_file, export_text_file,
     get_cached_models, delete_cached_model, get_ollama_models, check_for_updates, open_config_folder,
     WidgetMenuState, preview_widget_config, set_widget_menu_open, apply_widget_config_internal
 };
 use commands::hotkey::{register_hotkey, unregister_hotkey, register_polish_hotkey, unregister_polish_hotkey};
-use commands::sidecar::{SidecarState, start_sidecar, start_sidecar_with_state, send_to_sidecar, send_to_sidecar_owned, stop_sidecar, list_audio_devices, restart_sidecar_internal};
+use commands::sidecar::{SidecarState, start_sidecar, start_sidecar_with_state, send_to_sidecar, send_to_sidecar_owned, stop_sidecar, list_audio_devices, restart_sidecar_internal, transcribe_audio_file};
 use commands::injection::inject_text;
 use commands::storage::{get_api_key, set_api_key};
 
@@ -64,6 +64,7 @@ fn build_tray_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         MenuItem::with_id(app, "toggle_widget", "Toggle Floating Button", true, None::<&str>)?;
     let toggle_preview =
         MenuItem::with_id(app, "toggle_preview", "Toggle Preview Overlay", true, None::<&str>)?;
+    let transcribe = MenuItem::with_id(app, "transcribe", "Transcribe Audio File…", true, None::<&str>)?;
     let history = MenuItem::with_id(app, "history", "Session History…", true, None::<&str>)?;
     let settings = MenuItem::with_id(app, "settings", "Settings…", true, None::<&str>)?;
     let sep2 = PredefinedMenuItem::separator(app)?;
@@ -77,6 +78,7 @@ fn build_tray_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
             &sep1,
             &toggle_widget,
             &toggle_preview,
+            &transcribe,
             &history,
             &settings,
             &sep2,
@@ -298,7 +300,7 @@ pub fn run() {
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 let label = window.label();
-                if label == "settings" || label == "history" || label == "floating-widget" || label == "preview" {
+                if label == "settings" || label == "history" || label == "transcribe" || label == "floating-widget" || label == "preview" {
                     api.prevent_close();
                     let _ = window.hide();
                     if label == "settings" {
@@ -318,6 +320,7 @@ pub fn run() {
             get_corrections,
             save_corrections,
             select_file,
+            select_audio_file,
             export_text_file,
             register_hotkey,
             unregister_hotkey,
@@ -327,6 +330,7 @@ pub fn run() {
             send_to_sidecar,
             stop_sidecar,
             list_audio_devices,
+            transcribe_audio_file,
             inject_text,
             get_api_key,
             set_api_key,
@@ -362,6 +366,9 @@ pub fn run() {
                         }
                         "settings" => {
                             show_window(&handle, "settings");
+                        }
+                        "transcribe" => {
+                            show_window(&handle, "transcribe");
                         }
                         "history" => {
                             show_window(&handle, "history");

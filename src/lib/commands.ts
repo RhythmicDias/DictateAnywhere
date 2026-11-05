@@ -78,6 +78,26 @@ export async function selectFile(): Promise<string | null> {
   return invoke<string | null>("select_file");
 }
 
+/** Open native audio file dialog and return path */
+export async function selectAudioFile(): Promise<string | null> {
+  return invoke<string | null>("select_audio_file");
+}
+
+/** Start offline audio file transcription via sidecar */
+export async function transcribeAudioFile(
+  filePath: string,
+  includeTimestamps: boolean,
+  applyPolish: boolean,
+  language?: string
+): Promise<void> {
+  return invoke("transcribe_audio_file", {
+    filePath,
+    includeTimestamps,
+    applyPolish,
+    language,
+  });
+}
+
 export interface ModelCacheInfo {
   name: string;
   size_mb: number;

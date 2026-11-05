@@ -12,7 +12,7 @@ print(f"[Spec Build] src_dir is: {src_dir}")
 datas = collect_data_files("faster_whisper") + collect_data_files("ctranslate2")
 datas += collect_data_files("sounddevice")
 
-binaries = collect_dynamic_libs("ctranslate2") + collect_dynamic_libs("sounddevice")
+binaries = collect_dynamic_libs("ctranslate2") + collect_dynamic_libs("sounddevice") + collect_dynamic_libs("av")
 
 # Collect NVIDIA DLLs from virtual environment
 nvidia_binaries = []
@@ -68,7 +68,8 @@ a = Analysis(
         'sounddevice',
         'numpy',
         'faster_whisper',
-        'ctranslate2'
+        'ctranslate2',
+        'av'
     ],
     hookspath=['hooks'],
     hooksconfig={},

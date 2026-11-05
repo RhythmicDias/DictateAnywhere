@@ -7,6 +7,16 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [2.0.5] - 2026-11-05
+
+### Added
+- **Offline Audio File Transcription**: Introduced dedicated offline audio and video file transcription powered by local faster-whisper + PyAV with GPU (CUDA) acceleration.
+- **Dedicated Transcription Window**: Added a popup window (`640×540`) featuring audio file selection, drag-and-drop support, language selector, `[MM:SS]` timestamp toggle, and AI text polish integration.
+- **Multiple Entry Points**: Accessible directly from the System Tray menu (**Transcribe Audio File…**), the Floating Widget right-click menu (**Transcribe Audio…**), and the Settings window (**Audio Tab**).
+- **Format Support & Output**: Supports `.wav`, `.mp3`, `.m4a`, `.flac`, `.ogg`, `.opus`, `.aac`, `.wma`, `.webm`, `.mp4`, `.mkv` with 1-click **Save as `.txt`…** and clipboard copy.
+
+---
+
 ## [2.0.4] - 2026-10-26
 
 ### Added

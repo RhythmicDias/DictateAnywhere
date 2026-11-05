@@ -508,7 +508,7 @@ class SidecarRunner:
                 res = self.cloud_transcribe(audio_bytes, lang, api_keys, params)
         return res
 
-    def local_transcribe(self, audio_bytes: bytes, lang: str, params: Dict[str, Any]) -> TranscriptionResult:
+    def _ensure_local_engine(self, lang: str, params: Dict[str, Any]) -> bool:
         model_size = params.get("model_size", self.cfg.get("model_size", "small"))
         compute_type = params.get("compute_type", self.cfg.get("compute_type", "int8"))
         device = params.get("local_device", self.cfg.get("local_device", "auto"))
@@ -521,7 +521,6 @@ class SidecarRunner:
                 language=lang
             )
         else:
-            # Reconfigure dynamically if config changed
             if model_size != self.local_engine.model_size:
                 self.local_engine.set_model_size(model_size)
             if compute_type != self.local_engine.compute_type:
@@ -531,12 +530,148 @@ class SidecarRunner:
             self.local_engine.set_language(lang)
 
         if not self.local_engine.is_ready:
-            ok = self.local_engine.load()
-            if not ok:
-                return TranscriptionResult(text="", engine_name="local", error="Failed to load local Whisper model")
+            return self.local_engine.load()
+        return True
+
+    def local_transcribe(self, audio_bytes: bytes, lang: str, params: Dict[str, Any]) -> TranscriptionResult:
+        if not self._ensure_local_engine(lang, params):
+            return TranscriptionResult(text="", engine_name="local", error="Failed to load local Whisper model")
 
         beam_size = int(params.get("beam_size", self.cfg.get("beam_size", 1)))
-        return self.local_engine.transcribe(audio_bytes, language=lang, beam_size=beam_size)
+        return self.local_engine.transcribe(audio_bytes, language=lang, beam_size=beam_size)  # type: ignore[union-attr]
+
+    def start_file_transcription(
+        self,
+        file_path: str,
+        include_timestamps: bool,
+        apply_polish: bool,
+        params: Dict[str, Any],
+        api_keys: Dict[str, str],
+    ) -> None:
+        threading.Thread(
+            target=self._run_file_transcription,
+            args=(file_path, include_timestamps, apply_polish, params, api_keys),
+            daemon=True,
+        ).start()
+
+    def _run_file_transcription(
+        self,
+        file_path: str,
+        include_timestamps: bool,
+        apply_polish: bool,
+        params: Dict[str, Any],
+        api_keys: Dict[str, str],
+    ) -> None:
+        try:
+            lang = params.get("language", self.cfg.get("language", "auto"))
+            self.send_event("file_progress", {"percent": 2, "status": "Loading local Whisper model...", "partial_text": ""})
+
+            if not self._ensure_local_engine(lang, params):
+                self.send_event("file_error", {"message": "Failed to load local Whisper model."})
+                return
+
+            self.send_event("file_progress", {"percent": 5, "status": "Decoding and transcribing audio...", "partial_text": ""})
+
+            def on_progress(pct: int, partial: str) -> None:
+                self.send_event("file_progress", {
+                    "percent": max(5, pct),
+                    "status": f"Transcribing ({pct}%)...",
+                    "partial_text": partial,
+                })
+
+            beam_size = int(params.get("beam_size", self.cfg.get("beam_size", 1)))
+            res = self.local_engine.transcribe_file(  # type: ignore[union-attr]
+                file_path=file_path,
+                language=lang,
+                beam_size=beam_size,
+                include_timestamps=include_timestamps,
+                on_progress=on_progress,
+            )
+
+            if res.error:
+                self.send_event("file_error", {"message": res.error})
+                return
+
+            text = res.text.strip()
+            raw_text = text
+
+            if text and not include_timestamps:
+                text = clean_whisper_artifacts(text)
+                spoken_punctuation = params.get("spoken_punctuation", self.cfg.get("spoken_punctuation", True))
+                auto_capitalise = params.get("auto_capitalise", self.cfg.get("auto_capitalise", True))
+                text = process_text(
+                    text,
+                    previous_text="",
+                    apply_punctuation=spoken_punctuation,
+                    apply_capitalise=auto_capitalise,
+                )
+                text = self.corr.apply(text)
+                raw_text = text
+
+            polished = False
+            polish_provider = "none"
+            polish_model = ""
+            polish_status = "disabled"
+            polish_error = ""
+
+            if text and apply_polish:
+                provider = params.get("polish_provider", self.cfg.get("polish_provider", "none"))
+                action = params.get("polish_action", self.cfg.get("polish_action", "Fix Grammar & Spelling"))
+                custom_prompt = params.get("custom_polish_prompt", self.cfg.get("custom_polish_prompt", ""))
+                polish_provider = provider
+                self.send_event("file_progress", {"percent": 98, "status": f"Polishing with {provider}...", "partial_text": text})
+
+                if provider == "ollama":
+                    from dictateanywhere.core.polish import polish_with_ollama
+                    ollama_url = params.get("ollama_url", self.cfg.get("ollama_url", "http://localhost:11434"))
+                    ollama_model = params.get("polish_ollama_model", self.cfg.get("polish_ollama_model", "llama3"))
+                    polish_model = ollama_model
+                    timeout = float(params.get("polish_ollama_timeout", self.cfg.get("polish_ollama_timeout", 90.0)))
+                    text, success, err = polish_with_ollama(text, ollama_url, ollama_model, action, custom_prompt, timeout=timeout)
+                    polished = True
+                    polish_status = "success" if success else "failed"
+                    polish_error = err
+                elif provider == "gemini" and api_keys.get("gemini"):
+                    from dictateanywhere.core.polish import polish_with_gemini
+                    gemini_model = params.get("polish_gemini_model", self.cfg.get("polish_gemini_model", "gemini-flash-lite-latest"))
+                    polish_model = gemini_model
+                    text, success, err = polish_with_gemini(text, api_keys["gemini"], gemini_model, action, custom_prompt)
+                    polished = True
+                    polish_status = "success" if success else "failed"
+                    polish_error = err
+                elif provider == "openrouter" and api_keys.get("openrouter"):
+                    from dictateanywhere.core.polish import polish_with_openrouter
+                    openrouter_model = params.get("polish_openrouter_model", self.cfg.get("polish_openrouter_model", ""))
+                    polish_model = openrouter_model
+                    text, success, err = polish_with_openrouter(text, api_keys["openrouter"], openrouter_model, action, custom_prompt)
+                    polished = True
+                    polish_status = "success" if success else "failed"
+                    polish_error = err
+                elif provider == "groq" and api_keys.get("groq"):
+                    from dictateanywhere.core.polish import polish_with_groq
+                    groq_model = params.get("polish_groq_model", self.cfg.get("polish_groq_model", ""))
+                    polish_model = groq_model
+                    text, success, err = polish_with_groq(text, api_keys["groq"], groq_model, action, custom_prompt)
+                    polished = True
+                    polish_status = "success" if success else "failed"
+                    polish_error = err
+
+            self.send_event("file_result", {
+                "text": text.strip(),
+                "raw_text": raw_text.strip(),
+                "file_path": file_path,
+                "engine": res.engine_name,
+                "language": res.language or lang,
+                "duration_ms": res.duration_ms,
+                "polished": polished,
+                "polish_provider": polish_provider,
+                "polish_model": polish_model,
+                "polish_status": polish_status,
+                "polish_error": polish_error,
+            })
+        except Exception as exc:
+            logger.exception("Error in file transcription pipeline")
+            self.send_event("file_error", {"message": str(exc)})
 
     def cloud_transcribe(self, audio_bytes: bytes, lang: str, api_keys: Dict[str, str], params: Dict[str, Any]) -> TranscriptionResult:
         key = api_keys.get("azure")
@@ -648,6 +783,13 @@ def main():
                 runner.start_dictation(params, api_keys)
             elif cmd == "stop":
                 runner.stop_dictation()
+            elif cmd == "transcribe_file":
+                file_path = msg.get("file_path", "")
+                include_timestamps = bool(msg.get("include_timestamps", False))
+                apply_polish = bool(msg.get("apply_polish", False))
+                params = msg.get("config", {})
+                api_keys = msg.get("api_keys", {})
+                runner.start_file_transcription(file_path, include_timestamps, apply_polish, params, api_keys)
             else:
                 logger.warning(f"Unknown command: {cmd}")
         except Exception as e:

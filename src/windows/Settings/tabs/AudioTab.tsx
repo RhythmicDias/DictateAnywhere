@@ -1,4 +1,5 @@
 import React from "react";
+import { emit } from "@tauri-apps/api/event";
 
 interface AudioDevice {
   index: number;
@@ -35,6 +36,21 @@ export const AudioTab: React.FC<AudioTabProps> = ({
   return (
     <>
       <div className="tab-title">Audio & Microphone Settings</div>
+      <div className="setting-card">
+        <div className="setting-card-title">Offline Audio File Transcription</div>
+        <div className="form-helper" style={{ marginBottom: "10px" }}>
+          Transcribe pre-recorded audio or video files (.wav, .mp3, .m4a, .flac, .ogg, .opus, .mp4) offline using your local Whisper model and save directly to a .txt file.
+        </div>
+        <button
+          className="btn btn-primary"
+          onClick={() => {
+            emit("window://show", { label: "transcribe" }).catch(console.error);
+          }}
+        >
+          Transcribe Audio File…
+        </button>
+      </div>
+
       <div className="setting-card">
         <div className="setting-card-title">Microphone Selection</div>
         <div className="form-group">

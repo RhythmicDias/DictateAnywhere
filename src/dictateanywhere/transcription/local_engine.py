@@ -12,7 +12,7 @@ import logging
 import threading
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 import numpy as np
 
@@ -248,6 +248,108 @@ class LocalEngine(STTEngine):
         finally:
             self._status = EngineStatus.READY
 
+    def transcribe_file(
+        self,
+        file_path: str,
+        language: str = "en",
+        beam_size: Optional[int] = None,
+        include_timestamps: bool = False,
+        on_progress: Optional[Callable[[int, str], None]] = None,
+    ) -> TranscriptionResult:
+        """Transcribe an audio/video file from disk using PyAV + faster-whisper."""
+        if not self.is_ready:
+            return TranscriptionResult(
+                text="", engine_name=self.name,
+                error="Engine not loaded — call load() first"
+            )
+
+        path = Path(file_path)
+        if not path.is_file():
+            return TranscriptionResult(
+                text="", engine_name=self.name,
+                error=f"Audio file not found: {file_path}"
+            )
+
+        try:
+            self._status = EngineStatus.BUSY
+            logger.info("Transcribing file %r with Whisper model %s ...", file_path, self._model_size)
+            t0 = time.monotonic()
+            lang_code = language or self._language
+            if lang_code == "auto":
+                lang_code = None
+
+            active_beam = max(1, beam_size if beam_size is not None else self._beam_size)
+            with self._lock:
+                try:
+                    segments, info = self._model.transcribe(  # type: ignore[union-attr]
+                        str(path),
+                        language=lang_code,
+                        beam_size=active_beam,
+                        best_of=active_beam,
+                        temperature=0.0,
+                        vad_filter=True,
+                        word_timestamps=False,
+                        condition_on_previous_text=False,
+                    )
+
+                    total_duration = getattr(info, "duration", 0.0) or 0.0
+                    logger.info(
+                        "File duration: %.1fs, detected language: %s (prob: %.3f)",
+                        total_duration, info.language, info.language_probability,
+                    )
+
+                    text_parts = []
+                    for seg in segments:
+                        seg_text = seg.text.strip()
+                        if not seg_text:
+                            continue
+                        if include_timestamps:
+                            line = f"[{_format_timestamp(seg.start)} - {_format_timestamp(seg.end)}] {seg_text}"
+                        else:
+                            line = seg_text
+                        text_parts.append(line)
+
+                        if on_progress:
+                            pct = int(min(99, round((seg.end / total_duration) * 100))) if total_duration > 0 else 50
+                            separator = "\n" if include_timestamps else " "
+                            on_progress(pct, separator.join(text_parts))
+                except (RuntimeError, Exception) as cuda_err:
+                    err_str = str(cuda_err).lower()
+                    if self._device == "cuda" or any(x in err_str for x in ["cublas", "cuda", "cudnn", "load library", "not found"]):
+                        logger.warning("CUDA/cuBLAS error during file transcription: %s. Falling back to CPU (int8)...", cuda_err)
+                        self._device = "cpu"
+                        self._compute_type = "int8"
+                        self.unload()
+                        if self.load():
+                            return self.transcribe_file(
+                                file_path, language, beam_size, include_timestamps, on_progress
+                            )
+                    logger.error("File transcription error: %s", cuda_err)
+                    raise cuda_err
+
+            separator = "\n" if include_timestamps else " "
+            text = separator.join(text_parts).strip()
+            elapsed_ms = (time.monotonic() - t0) * 1000
+            logger.info("File transcription finished in %.1fs. Text length: %d", elapsed_ms / 1000.0, len(text))
+
+            result = TranscriptionResult(
+                text=text,
+                language=info.language,
+                confidence=None,
+                engine_name=self.name,
+                duration_ms=elapsed_ms,
+            )
+            self._log_result(result)
+            return result
+
+        except Exception as exc:
+            logger.exception("faster-whisper file transcription error")
+            return TranscriptionResult(
+                text="", engine_name=self.name, error=str(exc)
+            )
+        finally:
+            self._status = EngineStatus.READY
+
     def is_available(self) -> bool:
         """Local engine is always available once loaded."""
         return self._status in (EngineStatus.READY, EngineStatus.BUSY)
@@ -290,3 +392,13 @@ def _pcm_to_float32(pcm_bytes: bytes) -> np.ndarray:
     """Convert raw int16 PCM bytes to a normalised float32 numpy array."""
     int16_array = np.frombuffer(pcm_bytes, dtype=np.int16)
     return int16_array.astype(np.float32) / 32768.0
+
+
+def _format_timestamp(seconds: float) -> str:
+    """Format seconds as MM:SS (or HH:MM:SS if >= 1 hour)."""
+    total_sec = max(0, int(seconds))
+    hrs, rem = divmod(total_sec, 3600)
+    mins, secs = divmod(rem, 60)
+    if hrs > 0:
+        return f"{hrs:02d}:{mins:02d}:{secs:02d}"
+    return f"{mins:02d}:{secs:02d}"
